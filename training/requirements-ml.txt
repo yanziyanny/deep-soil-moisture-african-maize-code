@@ -1,0 +1,11 @@
+numpy
+pandas
+matplotlib
+geopandas
+pyogrio
+xarray
+scipy
+scikit-learn
+xgboost
+shap
+tqdm
