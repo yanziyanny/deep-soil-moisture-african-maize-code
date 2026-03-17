@@ -1,42 +1,46 @@
-# Nature Food Code Availability Package
+# Deep soil moisture reveals hidden water stress in African rainfed maize systems
 
-This folder is a hybrid code-availability package for the five main-text figures used in the Nature Food submission. The default path is a lightweight figure-reproduction package; an optional `training/` path is included for retraining the machine-learning-dependent analyses behind Figure 4 and Figure 5.
+This repository contains the code and processed data required to reproduce the five main-text figures for the manuscript *Deep soil moisture reveals hidden water stress in African rainfed maize systems*.
 
-Only code, documentation, shared map layers, and packaged processed data are intended to stay in this folder. Figure PNGs are generated on demand, and the optional retraining wrappers use temporary directories for upstream artifacts before syncing only the final packaged data back into this folder.
+The repository is organized as a lightweight figure-reproduction package by default. It also includes an optional `training/` workflow for retraining the machine-learning-dependent analyses underlying Fig. 4 and Fig. 5. Figure outputs are generated on demand as PNG files and are not stored in the repository.
 
-## Scope
+## Repository purpose
 
-- `figure1/`: VPD-soil moisture correlation figure
-- `figure2/`: Yield response, case studies, and mismatch maps
-- `figure3/`: Panel fixed-effects coefficient figure
-- `figure4/`: Drop-column importance across Koppen zones
-- `figure5/`: Monitoring blind spots map
-- `training/`: optional ML retraining wrappers and data-sync scripts for Figure 4 and Figure 5
-- `common/map_layers/`: Shared Africa admin2 boundaries and coastline layers used by map panels
+This package is designed for code availability and figure reproduction rather than full upstream data processing. It keeps only the scripts, shared map layers and processed inputs needed to regenerate the final figures reported in the manuscript.
 
-## What Is Included
+Included in this repository:
 
-- One plotting script per figure
-- Only the minimum processed data needed to regenerate the final figure
-- A top-level `run_all_figures.py` entry point
-- PNG outputs only
-- Optional ML retraining wrappers for the model-dependent figures
+- one plotting script for each main-text figure
+- processed figure-ready inputs required to regenerate the final figures
+- a top-level `run_all_figures.py` entry point
+- optional retraining wrappers for the machine-learning analyses behind Fig. 4 and Fig. 5
 
-## What Is Not Included
+Not included in this repository:
 
-- Full raw upstream remote-sensing archives
-- Heavy preprocessing steps that are not required to reproduce the final submitted figures
-- Mandatory retraining for default figure reproduction
+- full raw remote-sensing archives and upstream intermediate products
+- heavy preprocessing pipelines not required to reproduce the submitted figures
+- mandatory retraining for default figure reproduction
 
-## Run
+## Repository structure
 
-Create an environment with the dependencies in `requirements.txt`, then run:
+- `figure1/`: VPD and soil moisture correlation figure
+- `figure2/`: yield response, case studies and mismatch maps
+- `figure3/`: panel fixed-effects estimates
+- `figure4/`: climate-zone driver importance from drop-column analysis
+- `figure5/`: monitoring blind-spot risk maps
+- `training/`: optional retraining wrappers and sync scripts for Fig. 4 and Fig. 5
+- `common/map_layers/`: shared Africa admin2 boundaries and coastline layers
+
+## Quick start
+
+Install the base dependencies and run all main-text figures:
 
 ```bash
+pip install -r requirements.txt
 python run_all_figures.py
 ```
 
-You can also run figures individually:
+To run figures individually:
 
 ```bash
 python figure1/run_figure1.py
@@ -46,13 +50,26 @@ python figure4/run_figure4.py
 python figure5/run_figure5.py
 ```
 
-For optional ML retraining of the model-dependent figures:
+## Optional retraining
+
+The default workflow reproduces the final figures from packaged processed data. For readers who want to rerun the model-dependent analyses, optional retraining scripts are provided in `training/`.
 
 ```bash
 python training/run_optional_ml_retraining.py
 ```
 
-## Outputs
+The optional retraining path:
+
+- reruns the machine-learning-dependent analyses for Fig. 4 and Fig. 5
+- uses temporary directories for upstream artifacts so that intermediate files are not written into the repository
+- syncs only the final packaged data products back into the figure folders
+- retains the manuscript setting of `1000` bootstrap iterations for the Fig. 4 analysis
+
+Additional dependencies for the optional retraining workflow are listed in `training/requirements-ml.txt`.
+
+## Generated outputs
+
+Running the figure scripts generates the following PNG files:
 
 - `figure1/outputs/figure1_vpd_soil_moisture_correlation.png`
 - `figure2/outputs/figure2_yield_response_and_mismatch_maps.png`
@@ -60,14 +77,16 @@ python training/run_optional_ml_retraining.py
 - `figure4/outputs/figure4_climate_zone_driver_importance.png`
 - `figure5/outputs/figure5_monitoring_blind_spot_risk.png`
 
-## Data Provenance
+## Processed data sources
 
-The packaged inputs are reduced from the original project files:
+The packaged inputs were reduced from the original project analyses:
 
-- Figure 1: precomputed correlation arrays from `vpd_sm_correlation/`
-- Figure 2: processed coefficient table, extracted case-study time series, and precomputed mismatch frequencies
-- Figure 3: panel tables from `nature_code/data/`
-- Figure 4: bootstrap result summaries from `africa_sif_cluster80_cvmedian/outputs_koppen5_dropcol_bootstrap/`
-- Figure 5: precomputed monitoring-blind-spot table from `nature_code/monitoring_blind_spots/`
+- Fig. 1: precomputed correlation arrays derived from the `vpd_sm_correlation/` workflow
+- Fig. 2: processed coefficient tables, extracted case-study time series and precomputed mismatch frequencies
+- Fig. 3: processed panel tables derived from the annual panel analysis workflow
+- Fig. 4: packaged bootstrap summaries from the Koppen-zone drop-column analysis
+- Fig. 5: packaged admin2 monitoring blind-spot summaries derived from the monitoring workflow
 
-The default package is suitable for a code-availability repository because it provides figure-ready code plus the minimum processed data needed to regenerate the final published figures. The optional `training/` layer exposes a reproducible retraining path for the ML-dependent results without forcing every reader to run the full heavy analysis.
+## Reproducibility note
+
+This repository is intended to satisfy code-availability and figure-reproduction requirements for journal submission by combining figure-ready scripts with the minimum processed data needed to regenerate the published main-text figures. The optional retraining layer provides a reproducible path for the model-dependent results without requiring every reader to rerun the full heavy workflow.
