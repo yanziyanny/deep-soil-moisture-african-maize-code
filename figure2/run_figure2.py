@@ -12,6 +12,8 @@ from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
+from recompute_panel_a_coefficients import compute_panel_a_coefficients, read_exposure_input
+
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -20,7 +22,7 @@ OUT_FILE = HERE / "outputs" / "figure2_yield_response_and_mismatch_maps.png"
 BOUNDARY_FILE = ROOT / "common" / "map_layers" / "admin2_boundaries.geojson"
 COAST_FILE = ROOT / "common" / "map_layers" / "africa_coastline.geojson"
 
-COEF_FILE = HERE / "data" / "panel_a_exposure_coefficients.csv"
+REGRESSION_INPUT_FILE = HERE / "data" / "panel_a_regression_input.csv.gz"
 CASE_B_FILE = HERE / "data" / "panel_b_case_chad_2010.csv"
 CASE_C_FILE = HERE / "data" / "panel_c_case_malawi_2002.csv"
 CASE_C_META = HERE / "data" / "panel_c_case_metadata.json"
@@ -84,7 +86,7 @@ def significance_mask(coef, se):
 def main():
     HERE.joinpath("outputs").mkdir(parents=True, exist_ok=True)
 
-    df_coef = pd.read_csv(COEF_FILE)
+    df_coef = compute_panel_a_coefficients(read_exposure_input(REGRESSION_INPUT_FILE))
     case_b = pd.read_csv(CASE_B_FILE)
     case_c = pd.read_csv(CASE_C_FILE)
     case_c_meta = json.load(open(CASE_C_META))

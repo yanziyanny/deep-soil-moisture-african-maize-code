@@ -10,10 +10,10 @@ import sys
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PACKAGE_ROOT.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
 
-from nature_food_code_availability.figure_manifest import ML_RETRAIN_TARGETS, package_path
+from figure_manifest import ML_RETRAIN_TARGETS, package_path
 
 
 TARGET = ML_RETRAIN_TARGETS["figure4"]
@@ -42,8 +42,12 @@ def main():
     print("[retrain_figure4] Running upstream Figure 4 ML retraining...")
     with TemporaryDirectory(prefix="nature_food_fig4_") as temp_dir:
         temp_output_dir = Path(temp_dir)
+        packaged_input = package_path(TARGET["packaged_training_input"])
+        if not packaged_input.exists():
+            raise FileNotFoundError(f"Missing packaged Figure 4 retraining input: {packaged_input}")
         env = os.environ.copy()
         env["AFRICA_SIF_KOPPEN_BOOTSTRAP_OUTPUT_DIR"] = str(temp_output_dir)
+        env["AFRICA_SIF_KOPPEN_BOOTSTRAP_DATA_FILE"] = str(packaged_input)
         subprocess.run([sys.executable, TARGET["upstream_script"]], check=True, cwd=REPO_ROOT, env=env)
         sync_outputs(temp_output_dir)
     print("[retrain_figure4] Done.")

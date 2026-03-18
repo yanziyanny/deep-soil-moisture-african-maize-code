@@ -39,7 +39,6 @@ def package_path(relative_path: str) -> Path:
 
 
 _FIGURE4_OUTPUT_ROOT = REPO_ROOT / "africa_sif_cluster80_cvmedian" / "outputs_koppen5_dropcol_bootstrap"
-_FIGURE5_OUTPUT_ROOT = REPO_ROOT / "nature_code" / "monitoring_blind_spots"
 
 
 ML_RETRAIN_TARGETS = {
@@ -47,6 +46,7 @@ ML_RETRAIN_TARGETS = {
         "upstream_script": str(
             (REPO_ROOT / "africa_sif_cluster80_cvmedian" / "scripts" / "run_koppen5_dropcol_bootstrap.py").resolve()
         ),
+        "packaged_training_input": "training/data/figure4_retraining_input.csv.gz",
         "sync_outputs": [
             "figure4/data/summary.csv",
             "figure4/data/koppen1/results.json",
@@ -62,20 +62,6 @@ ML_RETRAIN_TARGETS = {
             str((_FIGURE4_OUTPUT_ROOT / "koppen3" / "results.json").resolve()): "figure4/data/koppen3/results.json",
             str((_FIGURE4_OUTPUT_ROOT / "koppen4" / "results.json").resolve()): "figure4/data/koppen4/results.json",
             str((_FIGURE4_OUTPUT_ROOT / "koppen5" / "results.json").resolve()): "figure4/data/koppen5/results.json",
-        },
-    },
-    "figure5": {
-        "upstream_script": str(
-            (REPO_ROOT / "africa_sif_cluster80_cvmedian" / "scripts" / "run_admin2_driver_mapping.py").resolve()
-        ),
-        "downstream_refresh_script": str(
-            (REPO_ROOT / "nature_code" / "monitoring_blind_spots" / "figure_monitoring_blind_spots.py").resolve()
-        ),
-        "sync_outputs": [
-            "figure5/data/monitoring_blind_spots_data.csv",
-        ],
-        "sync_map": {
-            str((_FIGURE5_OUTPUT_ROOT / "monitoring_blind_spots_data.csv").resolve()): "figure5/data/monitoring_blind_spots_data.csv",
         },
     },
 }
