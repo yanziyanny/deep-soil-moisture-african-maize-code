@@ -1,6 +1,7 @@
-numpy
-pandas
-matplotlib
-geopandas
-pyogrio
-linearmodels
+numpy>=1.26,<2.0
+pandas>=2.1,<2.3
+matplotlib>=3.8,<3.10
+geopandas>=1.0,<1.2
+pyogrio>=0.10,<0.13
+shapely>=2.0,<2.2
+linearmodels>=7.0,<8.0

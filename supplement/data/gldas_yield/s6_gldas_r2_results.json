@@ -1,0 +1,39 @@
+{
+  "model_description": "Two-way FE (Admin2 + Year), GLDAS SM",
+  "sm_source": "GLDAS NOAH025 v2.1",
+  "L2L3_formula": "(30*VWC_L2 + 60*VWC_L3) / 90",
+  "pooled_models": {
+    "M1": {
+      "within_r2": 0.0194,
+      "overall_r2": 0.7447,
+      "n_observations": 7955
+    },
+    "M2": {
+      "within_r2": 0.0221,
+      "overall_r2": 0.7454,
+      "n_observations": 7955
+    },
+    "M3": {
+      "within_r2": 0.0225,
+      "overall_r2": 0.7455,
+      "n_observations": 7955
+    }
+  },
+  "growth_stage_models": {
+    "Vegetative": {
+      "within_r2": 0.0195,
+      "overall_r2": 0.7447,
+      "n_observations": 7955
+    },
+    "Reproductive": {
+      "within_r2": 0.0434,
+      "overall_r2": 0.7509,
+      "n_observations": 7955
+    },
+    "Maturation": {
+      "within_r2": 0.0174,
+      "overall_r2": 0.7441,
+      "n_observations": 7955
+    }
+  }
+}

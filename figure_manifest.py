@@ -2,7 +2,6 @@ from pathlib import Path
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
-REPO_ROOT = PACKAGE_ROOT.parent
 
 
 FIGURES = [
@@ -38,14 +37,9 @@ def package_path(relative_path: str) -> Path:
     return PACKAGE_ROOT / relative_path
 
 
-_FIGURE4_OUTPUT_ROOT = REPO_ROOT / "africa_sif_cluster80_cvmedian" / "outputs_koppen5_dropcol_bootstrap"
-
-
 ML_RETRAIN_TARGETS = {
     "figure4": {
-        "upstream_script": str(
-            (REPO_ROOT / "africa_sif_cluster80_cvmedian" / "scripts" / "run_koppen5_dropcol_bootstrap.py").resolve()
-        ),
+        "entry_point": "training/run_optional_ml_retraining.py",
         "packaged_training_input": "training/data/figure4_retraining_input.csv.gz",
         "sync_outputs": [
             "figure4/data/summary.csv",
@@ -55,13 +49,5 @@ ML_RETRAIN_TARGETS = {
             "figure4/data/koppen4/results.json",
             "figure4/data/koppen5/results.json",
         ],
-        "sync_map": {
-            str((_FIGURE4_OUTPUT_ROOT / "summary.csv").resolve()): "figure4/data/summary.csv",
-            str((_FIGURE4_OUTPUT_ROOT / "koppen1" / "results.json").resolve()): "figure4/data/koppen1/results.json",
-            str((_FIGURE4_OUTPUT_ROOT / "koppen2" / "results.json").resolve()): "figure4/data/koppen2/results.json",
-            str((_FIGURE4_OUTPUT_ROOT / "koppen3" / "results.json").resolve()): "figure4/data/koppen3/results.json",
-            str((_FIGURE4_OUTPUT_ROOT / "koppen4" / "results.json").resolve()): "figure4/data/koppen4/results.json",
-            str((_FIGURE4_OUTPUT_ROOT / "koppen5" / "results.json").resolve()): "figure4/data/koppen5/results.json",
-        },
     },
 }

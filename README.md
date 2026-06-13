@@ -1,75 +1,58 @@
 # Deep soil moisture reveals hidden water stress in African rainfed maize systems
 
-This repository contains the code and processed data required to reproduce the five main-text figures for the manuscript *Deep soil moisture reveals hidden water stress in African rainfed maize systems*.
+This repository contains code and processed data required to reproduce the five main-text figures for the manuscript *Deep soil moisture reveals hidden water stress in African rainfed maize systems*.
 
-The repository is organized as a lightweight figure-reproduction package by default. It also includes an optional `training/` workflow for retraining the machine-learning-dependent analysis underlying Fig. 4. Figure outputs are generated on demand as PNG files and are not stored in the repository.
+The repository is a lightweight figure-reproduction package by default. It also includes an optional, self-contained `training/` workflow for rerunning the machine-learning analysis behind Figure 4 from the packaged reduced 8-day panel.
 
-## Repository purpose
+## Repository Purpose
 
-This package is designed for code availability and figure reproduction rather than full upstream data processing. It keeps only the scripts, shared map layers and processed inputs needed to regenerate the final figures reported in the manuscript.
-
-Included in this repository:
+Included:
 
 - one plotting script for each main-text figure
 - processed figure-ready inputs required to regenerate the final figures
 - a top-level `run_all_figures.py` entry point
-- optional retraining support for the machine-learning analysis behind Fig. 4
+- optional XGBoost retraining support for the Figure 4 attribution analysis
+- split/fold leakage checks, a model card, supplement table support, tests, and smoke checks
 
-Not included in this repository:
+Not included:
 
-- full raw remote-sensing archives and upstream intermediate products
-- heavy preprocessing pipelines not required to reproduce the submitted figures
+- full raw remote-sensing archives
+- heavy upstream preprocessing pipelines
+- manuscript PDFs or manuscript editing scripts
 - mandatory retraining for default figure reproduction
 
-## Repository structure
+## Install
 
-- `figure1/`: VPD and soil moisture correlation figure
-- `figure2/`: yield response, case studies and mismatch maps
-- `figure3/`: panel fixed-effects estimates
-- `figure4/`: climate-zone driver importance from drop-column analysis
-- `figure5/`: monitoring blind-spot risk maps
-- `training/`: optional retraining wrapper and packaged input for Fig. 4
-- `common/map_layers/`: shared Africa admin2 boundaries and coastline layers
-
-## Quick start
-
-Install the base dependencies and run all main-text figures:
+Python 3.11 is recommended.
 
 ```bash
 pip install -r requirements.txt
+```
+
+For the optional ML workflow:
+
+```bash
+pip install -r training/requirements-ml.txt
+```
+
+A conda-style environment file is also provided:
+
+```bash
+conda env create -f environment.yml
+conda activate deep-soil-moisture-maize
+```
+
+`requirements-lock.txt` records versions observed in the development environment.
+
+## Main-Text Figure Reproduction
+
+Run all main-text figures:
+
+```bash
 python run_all_figures.py
 ```
 
-To run figures individually:
-
-```bash
-python figure1/run_figure1.py
-python figure2/run_figure2.py
-python figure3/run_figure3.py
-python figure4/run_figure4.py
-python figure5/run_figure5.py
-```
-
-## Optional retraining
-
-The default workflow reproduces the final figures from packaged processed data. For readers who want to rerun the model-dependent analysis behind Fig. 4, an optional retraining workflow is provided in `training/`.
-
-```bash
-python training/run_optional_ml_retraining.py
-```
-
-The optional retraining path:
-
-- reruns the machine-learning-dependent analysis for Fig. 4 from a packaged reduced 8-day panel table
-- uses temporary directories for upstream artifacts so that intermediate files are not written into the repository
-- syncs only the final packaged data products back into the figure folders
-- retains the manuscript setting of `1000` bootstrap iterations for the Fig. 4 analysis
-
-Additional dependencies for the optional retraining workflow are listed in `training/requirements-ml.txt`.
-
-## Generated outputs
-
-Running the figure scripts generates the following PNG files:
+Expected outputs:
 
 - `figure1/outputs/figure1_vpd_soil_moisture_correlation.png`
 - `figure2/outputs/figure2_yield_response_and_mismatch_maps.png`
@@ -77,16 +60,128 @@ Running the figure scripts generates the following PNG files:
 - `figure4/outputs/figure4_climate_zone_driver_importance.png`
 - `figure5/outputs/figure5_monitoring_blind_spot_risk.png`
 
-## Processed data sources
+Run a lightweight import/path smoke check without rendering figures:
 
-The packaged inputs were reduced from the original project analyses:
+```bash
+python run_all_figures.py --smoke
+```
 
-- Fig. 1: precomputed correlation arrays derived from the `vpd_sm_correlation/` workflow
-- Fig. 2: packaged panel-a regression input, extracted case-study time series and precomputed mismatch frequencies
-- Fig. 3: packaged `admin2 × year` annual and stage-specific panel tables used for the fixed-effects regressions
-- Fig. 4: packaged bootstrap summaries plus a reduced retraining input table for the Koppen-zone drop-column analysis
-- Fig. 5: packaged admin2 monitoring blind-spot summaries derived from the monitoring workflow
+Figure 4 is plotted by default from the packaged model-result summaries in `figure4/data/summary.csv` and `figure4/data/koppen*/results.json`. This keeps the default figure-reproduction path lightweight and deterministic.
 
-## Reproducibility note
+## Optional Figure 4 ML Retraining
 
-This repository is intended to satisfy code-availability and figure-reproduction requirements for journal submission by combining figure-ready scripts with the minimum processed data needed to regenerate the published main-text figures. The optional retraining layer provides a reproducible path for the key model-dependent result in Fig. 4 without requiring every reader to rerun the full heavy workflow.
+Quick smoke run:
+
+```bash
+python training/run_optional_ml_retraining.py --quick
+```
+
+Full optional run from the packaged reduced 8-day training panel:
+
+```bash
+python training/run_optional_ml_retraining.py --bootstrap-iters 1000
+```
+
+The retraining input is `training/data/figure4_retraining_input.csv.gz`. Bootstrap, split, cross-validation, feature-group, and hard-filter settings are defined in `training/config.yml`; `bootstrap.iters` is `1000`, `bootstrap.cluster_variable` is `county_year`, and the confidence level is `0.95`. The command-line `--bootstrap-iters` value overrides the config value.
+
+Expected machine-readable outputs:
+
+- `training/outputs/model_metrics_by_zone.csv`
+- `training/outputs/drop_column_importance_individual.csv`
+- `training/outputs/drop_column_importance_group.csv`
+- `training/outputs/bootstrap_confidence_intervals.csv`
+- `training/outputs/train_test_split_ids.csv`
+- `training/outputs/groupkfold_fold_ids.csv`
+- `training/outputs/run_metadata.json`
+- `training/outputs/figure4_data/summary.csv`
+- `training/outputs/figure4_data/koppen*/results.json`
+
+The full non-quick workflow also syncs regenerated packaged Figure 4 data to:
+
+- `figure4/data/summary.csv`
+- `figure4/data/koppen1/results.json`
+- `figure4/data/koppen2/results.json`
+- `figure4/data/koppen3/results.json`
+- `figure4/data/koppen4/results.json`
+- `figure4/data/koppen5/results.json`
+
+`--quick` intentionally leaves `figure4/data/` unchanged unless `--sync-figure-data` is provided. Full optional ML retraining is heavier than default figure reproduction.
+
+To audit retraining without replacing the packaged Figure 4 inputs, run:
+
+```bash
+python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --no-sync-figure-data
+```
+
+Nature Portfolio machine-learning checklist review does not require the default `python run_all_figures.py` command to rerun model training. The repository provides both paths: a default figure-reproduction path from packaged processed outputs, and a separate self-contained retraining path with split IDs, validation folds, bootstrap confidence intervals, and model metrics.
+
+## Supplement Support
+
+Run supplement table reproduction:
+
+```bash
+python supplement/run_all_supplement.py --quick
+```
+
+Expected outputs:
+
+- `supplement/outputs/s3_gleam_sm_vpd_coupling_summary.csv`
+- `supplement/outputs/s4_gldas_sm_vpd_coupling_summary.csv`
+- `supplement/outputs/s5_gldas_yield_response_coefficients.csv`
+- `supplement/outputs/s6_gldas_yield_sensitivity_r2.csv`
+- `supplement/outputs/s7_gldas_sif_attribution_summary.csv`
+- `supplement/outputs/s8_xgboost_model_performance.csv`
+- `supplement/outputs/s9_shapley_feature_decomposition.csv`
+- `supplement/outputs/s9_shapley_group_decomposition.csv`
+- `supplement/outputs/s9_partial_r2.csv`
+- `supplement/outputs/s10_hard_energy_filtering_sensitivity.csv` after optional ML retraining has produced `training/outputs/hard_energy_filtering_sensitivity.csv`
+- `supplement/outputs/supplement_run_report.json`
+
+Supplement processed inputs are listed in `DATA_DICTIONARY.md`.
+
+## Benchmarking
+
+Run:
+
+```bash
+python scripts/benchmark_runtime.py
+```
+
+Expected output:
+
+- `training/outputs/benchmark_runtime.json`
+
+Record runtime and hardware values in `COMPUTATIONAL_RESOURCES.md`. To time the smoke workflow only, run:
+
+```bash
+python scripts/benchmark_runtime.py --smoke-figures
+```
+
+## Nature ML Checklist Support
+
+| Checklist item | Repository support |
+| --- | --- |
+| Source code | `figure*/run_figure*.py`, `run_all_figures.py`, `training/ml_pipeline/`, `supplement/run_all_supplement.py` |
+| Test/processed dataset | `figure*/data/`, `common/map_layers/`, `training/data/figure4_retraining_input.csv.gz` |
+| README instructions | this file, `training/README.md`, `training/data/README.md`, `supplement/README.md` |
+| Train/test split | `training/config.yml`, `training/outputs/train_test_split_ids.csv` |
+| Validation folds | `training/config.yml`, `training/outputs/groupkfold_fold_ids.csv` |
+| Model card | `MODEL_CARD.md` |
+| Ablation/drop-column | `training/outputs/drop_column_importance_individual.csv`, `training/outputs/drop_column_importance_group.csv` |
+| Bootstrap CIs | `training/outputs/bootstrap_confidence_intervals.csv` |
+| Shapley sensitivity | `figure4/data/koppen*/results.json`, `supplement/outputs/s9_*` |
+| Hard energy filtering | `training/config.yml`, `training/outputs/hard_energy_filtering_sensitivity.csv` |
+| Benchmark/baseline context | `MODEL_CARD.md` |
+| Computational resources | `COMPUTATIONAL_RESOURCES.md`, `scripts/benchmark_runtime.py` |
+| Tests/smoke checks | `tests/` |
+| License | `LICENSE` |
+
+## Minimum Processed Dataset
+
+This repository contains processed figure-ready data and a reduced ML retraining panel. It does not contain full remote-sensing archives. The default workflow can reproduce the submitted main-text figures without rerunning upstream data acquisition or preprocessing.
+
+See `DATA_DICTIONARY.md` for file-level documentation.
+
+## License
+
+This code package is released under the MIT License. See `LICENSE`.
