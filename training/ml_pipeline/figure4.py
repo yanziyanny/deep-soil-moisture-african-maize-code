@@ -75,7 +75,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--sync-figure-data",
         action="store_true",
-        help="Sync generated Figure 4 summary/results into figure4/data even in quick mode",
+        help="Also write generated Figure 4 summary/results into figure4/data",
     )
     parser.add_argument(
         "--no-sync-figure-data",
@@ -1202,12 +1202,7 @@ def run_from_args(args: argparse.Namespace) -> None:
     outputs_dir = Path(args.outputs_dir)
     if not outputs_dir.is_absolute():
         outputs_dir = REPO_ROOT / outputs_dir
-    if args.no_sync_figure_data:
-        sync = False
-    elif args.sync_figure_data:
-        sync = True
-    else:
-        sync = not args.quick
+    sync = bool(args.sync_figure_data and not args.no_sync_figure_data)
     run_pipeline(config_path, input_file, outputs_dir, args.bootstrap_iters, args.quick, sync)
 
 

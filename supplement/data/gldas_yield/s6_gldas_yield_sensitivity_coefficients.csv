@@ -1,0 +1,14 @@
+panel,model,term,stage,variable,estimate,se,stars,significant
+a,M1,VPD+L1,,VPD,48.23,15.87,***,true
+a,M2,VPD+L2L3,,VPD,36.95,13.71,**,true
+a,M3,VPD+L1+L2L3,,VPD,27.80,13.76,*,true
+b,M1,VPD+L1,,L1,23.35,7.63,***,true
+b,M2,VPD+L2L3,,L2L3,21.95,5.45,***,true
+b,M3,VPD+L1+L2L3,,L1,-14.31,9.65,,false
+b,M3,VPD+L1+L2L3,,L2L3,33.90,11.02,***,true
+c,Stage,,Vegetative,L1,26.97,12.49,*,true
+c,Stage,,Vegetative,L2L3,-5.49,5.68,,false
+c,Stage,,Reproductive,L1,-29.21,4.95,***,true
+c,Stage,,Reproductive,L2L3,45.21,9.48,***,true
+c,Stage,,Maturation,L1,-22.01,4.06,***,true
+c,Stage,,Maturation,L2L3,44.40,7.07,***,true

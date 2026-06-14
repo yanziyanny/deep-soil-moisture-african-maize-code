@@ -54,12 +54,12 @@ The workflow writes:
 - `training/outputs/figure4_data/summary.csv`
 - `training/outputs/figure4_data/koppen*/results.json`
 
-The full non-quick workflow syncs regenerated Figure 4 packaged outputs into `figure4/data/`. Quick mode leaves `figure4/data/` unchanged unless `--sync-figure-data` is explicitly passed.
+By default, retraining leaves the packaged Figure 4 inputs in `figure4/data/` unchanged and writes regenerated files under `training/outputs/figure4_data/`.
 
-Run full retraining without replacing the packaged Figure 4 inputs:
+Run full retraining and also replace the packaged Figure 4 inputs:
 
 ```bash
-python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --no-sync-figure-data
+python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --sync-figure-data
 ```
 
 ## Split Controls
