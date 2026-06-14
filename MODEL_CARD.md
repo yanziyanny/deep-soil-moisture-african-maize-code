@@ -60,7 +60,7 @@ The configured hard energy thresholds are:
 - VPD > 0.5 kPa.
 - SW > 200 W m-2.
 
-The reduced packaged retraining panel contains raw VPD, Tmax, and SW columns for this sensitivity. The retraining code converts thresholds when the packaged raw-column range indicates an equivalent unit such as hPa for VPD or MJ m-2 day-1 for SW.
+The packaged analysis-ready retraining panel contains raw VPD, Tmax, and SW columns for this sensitivity. The retraining code converts thresholds when the packaged raw-column range indicates an equivalent unit such as hPa for VPD or MJ m-2 day-1 for SW.
 
 ## Intended Uses
 
@@ -76,7 +76,7 @@ The reduced packaged retraining panel contains raw VPD, Tmax, and SW columns for
 
 ## Limitations
 
-- The repository contains processed figure-ready data and a reduced ML retraining panel, not raw remote-sensing archives.
+- The repository contains processed figure-ready data and an analysis-ready ML retraining panel, not raw remote-sensing archives.
 - Exact hard energy-filtering sensitivity depends on the documented unit conversion for raw VPD and SW thresholds in `training/config.yml`.
 - Quick mode is a smoke-test mode and should not be used for manuscript numerical values.
 - The processed panel inherits coverage, retrieval, and representativeness limits from satellite SIF, gridded meteorology, soil-moisture products, crop maps, and administrative yield data. The model should therefore be interpreted as an attribution analysis for the packaged African rainfed-maize analysis domain, not as a bias-free representation of all African cropping systems.

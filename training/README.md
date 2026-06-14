@@ -6,10 +6,10 @@ This directory contains the optional, self-contained retraining path for the mac
 
 - `config.yml`: split, fold, feature-group, early-stopping, bootstrap, and hard-filter settings.
 - `ml_pipeline/`: in-repository XGBoost retraining implementation.
-- `data/figure4_retraining_input.csv.gz`: packaged reduced 8-day panel used for retraining.
+- `data/figure4_retraining_input.csv.gz`: packaged analysis-ready 8-day panel used for retraining.
 - `run_optional_ml_retraining.py`: command-line entry point.
 
-The workflow uses only in-repository code plus the packaged reduced retraining panel.
+The workflow uses only in-repository code plus the packaged analysis-ready retraining panel.
 
 ## Commands
 
@@ -19,7 +19,7 @@ Quick smoke run:
 python training/run_optional_ml_retraining.py --quick
 ```
 
-Full run from the packaged reduced 8-day training panel:
+Full run from the packaged analysis-ready 8-day training panel:
 
 ```bash
 python training/run_optional_ml_retraining.py --bootstrap-iters 1000
@@ -72,4 +72,4 @@ The Figure 4 attribution model uses the same soft energy-availability sample wei
 
 ## Hard Energy Filtering
 
-The reduced input contains raw VPD, Tmax, and SW columns for the hard energy-filtering sensitivity. Thresholds are configured in `training/config.yml`; the retraining code converts threshold units when the packaged raw-column range indicates an equivalent unit such as hPa for VPD or MJ m-2 day-1 for SW.
+The analysis-ready input contains raw VPD, Tmax, and SW columns for the hard energy-filtering sensitivity. Thresholds are configured in `training/config.yml`; the retraining code converts threshold units when the packaged raw-column range indicates an equivalent unit such as hPa for VPD or MJ m-2 day-1 for SW.

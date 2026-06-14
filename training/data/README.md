@@ -4,11 +4,13 @@
 
 Path: `training/data/figure4_retraining_input.csv.gz`
 
-Purpose: reduced 8-day panel for optional XGBoost retraining of the Figure 4 SIF anomaly attribution analysis.
+Purpose: analysis-ready 8-day panel for optional XGBoost retraining of the Figure 4 SIF anomaly attribution analysis.
 
 Rows: 1,000,127.
 
-Data level: processed retraining panel, not raw remote-sensing data.
+Data level: processed 8-day retraining panel, not raw remote-sensing data.
+
+Each row represents an admin2/county-like unit in one year and one 8-day growing-season window.
 
 Required for: optional ML retraining.
 
@@ -37,6 +39,6 @@ The workflow constructs `county_year` from `admin2_idx` and `year`.
 
 The packaged panel includes the raw VPD, Tmax, and SW columns needed by the hard energy-filtering sensitivity. `training/config.yml` stores the manuscript thresholds as Tmax > 15 C, VPD > 0.5 kPa, and SW > 200 W m-2. The retraining code converts thresholds to the packaged raw-column units when the value range indicates an equivalent unit such as hPa for VPD or MJ m-2 day-1 for SW.
 
-## Minimum Processed Dataset
+## Reproducibility Scope
 
-The repository contains processed figure-ready inputs and this reduced ML retraining panel. It does not include full upstream remote-sensing archives or every intermediate product used during original data processing.
+The repository contains processed figure-ready inputs and this analysis-ready ML retraining panel. It does not include full upstream remote-sensing archives or every intermediate product used during original data processing.

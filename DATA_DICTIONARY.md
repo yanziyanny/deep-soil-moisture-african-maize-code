@@ -1,14 +1,14 @@
 # Data Dictionary
 
-This repository contains processed figure-ready data and a reduced ML retraining panel. It does not contain full raw remote-sensing archives.
+This repository contains processed figure-ready data and an analysis-ready 8-day ML retraining panel. It does not contain full raw remote-sensing archives.
 
-## Minimum Processed Dataset
+## Analysis-Ready Dataset
 
-The minimum processed dataset consists of:
+The packaged analysis-ready dataset consists of:
 
 - `figure*/data/`: figure-ready main-text inputs.
 - `common/map_layers/`: shared processed map layers used by the plotting scripts.
-- `training/data/figure4_retraining_input.csv.gz`: reduced panel for optional Figure 4 ML retraining.
+- `training/data/figure4_retraining_input.csv.gz`: 8-day processed panel for optional Figure 4 ML retraining.
 
 ## Packaged Inputs
 
@@ -28,7 +28,7 @@ The minimum processed dataset consists of:
 | `figure4/data/summary.csv` | Packaged Figure 4 climate-zone model summary | Figure 4 | `koppen_id`, `test_r2`, `delta_energy`, `delta_surface`, `delta_rootwater`, `dominance`, `top_var` | R2 and Delta R2 | summary data | default figure reproduction |
 | `figure4/data/koppen*/results.json` | Packaged model results by climate zone | Figure 4, Supplement S8-S9 | `metrics`, `drop_group_delta`, `drop_column_delta`, bootstrap CI fields, `shap_feature`, `shap_group`, `partial_r2` | R2, Delta R2, model metrics | summary data | default figure and supplement reproduction |
 | `figure5/data/monitoring_blind_spots_data.csv` | Monitoring blind-spot risk summaries by admin2 | Figure 5 | `admin2_idx`, `r2_full`, `delta_*`, `dominance_class`, `koppen_id`, `total_mismatch_freq`, `risk_class`, `avg_production` | R2, Delta R2, frequencies, production summary | processed summary table | default figure reproduction |
-| `training/data/figure4_retraining_input.csv.gz` | Reduced 8-day panel for optional ML retraining | Figure 4 retraining | `admin2_idx`, `year`, `koppen5`, `sif_anom`, anomaly predictors, `PPTa_8sum`, `VPD_8mean_raw`, `Tmax_8mean_raw`, `SW_8mean_raw` | SIF anomaly, environmental anomalies, precipitation-sum anomaly, raw VPD/Tmax/SW for hard filtering | processed retraining panel | optional ML retraining |
+| `training/data/figure4_retraining_input.csv.gz` | Analysis-ready 8-day panel for optional ML retraining | Figure 4 retraining | `admin2_idx`, `year`, `koppen5`, `sif_anom`, `VPDa_8mean`, `SWa_8mean`, `Tmaxa_8mean`, `SMa_L1_8mean`, `SMa_L2_8mean`, `SMa_L3_8mean`, `PPTa_8sum`, `VPD_8mean_raw`, `Tmax_8mean_raw`, `SW_8mean_raw` | SIF anomaly, environmental anomalies, precipitation-sum anomaly, raw VPD/Tmax/SW for hard filtering | processed 8-day panel | optional ML retraining |
 | `supplement/data/coupling/*.npy` | Processed SM-VPD correlation rasters for GLEAM and GLDAS robustness checks | Supplementary Figures S3-S4 | finite Pearson correlation arrays | correlation r, dimensionless | processed summary arrays | supplement reproduction |
 | `supplement/data/figures/s3_*` through `s7_*` | Figure-ready robustness panels copied by the supplement runner | Supplementary Figures S3-S7 | PNG/PDF image files | figure-ready visual outputs | processed figure outputs | supplement reproduction |
 | `supplement/data/gldas_yield/s5_gldas_exposure_coefficients.csv` | GLDAS Noah nonlinear yield-response coefficients | Supplementary Figure S5 | `decile`, `L1_pct`, `L2L3_pct`, `VPD_pct`, standard-error columns | percent yield change | processed summary table | supplement reproduction |
