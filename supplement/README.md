@@ -16,6 +16,6 @@ Outputs:
 - S6 GLDAS Noah yield-sensitivity R2 table and figure copy.
 - S7 GLDAS Noah SIF attribution summary table and figure copy.
 - S8 XGBoost model performance table from `figure4/data/koppen*/results.json`.
-- S9 Shapley feature/group and partial R2 tables from `figure4/data/koppen*/results.json`.
+- S9 Shapley R2 group decomposition from `supplement/data/shapley_r2/`.
 - S10 hard energy-filtering table from `supplement/data/hard_energy_filtering/` or from `training/outputs/hard_energy_filtering_sensitivity.csv` if optional ML retraining has been run.
 - `supplement/outputs/supplement_run_report.json`.

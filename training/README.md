@@ -72,4 +72,4 @@ The Figure 4 attribution model uses soft energy-availability sample weights defi
 
 ## Hard Energy Filtering
 
-The analysis-ready input contains raw VPD, Tmax, and SW columns for the hard energy-filtering sensitivity. Thresholds are configured in `training/config.yml`; the retraining code converts threshold units when the packaged raw-column range indicates an equivalent unit such as hPa for VPD or MJ m-2 day-1 for SW.
+The hard-filter sensitivity filters observations before splitting, then retrains unweighted models. Thresholds are configured in `training/config.yml`: `SW_8mean_raw >= 21.6` MJ m-2 day-1 and `Tmax_8mean_raw >= 18` C.

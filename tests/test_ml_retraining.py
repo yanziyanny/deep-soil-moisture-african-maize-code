@@ -61,8 +61,10 @@ def test_quick_retraining_outputs_and_leakage_checks(tmp_path):
     assert set(split["split"]) == {"train", "test"}
 
     hard_filter = pd.read_csv(output_dir / "hard_energy_filtering_sensitivity.csv")
-    assert "computed" in set(hard_filter["status"])
-    assert hard_filter["reason"].str.contains("VPD_8mean_raw").any()
+    assert {"test_r2", "delta_energy", "delta_surface", "delta_rootwater", "sw_threshold", "tmax_threshold"}.issubset(hard_filter.columns)
+    assert set(hard_filter["sw_threshold"]) == {21.6}
+    assert set(hard_filter["tmax_threshold"]) == {18.0}
+    assert "vpd_threshold" not in {column.lower() for column in hard_filter.columns}
 
 
 def test_figure4_split_matches_packaged_results():

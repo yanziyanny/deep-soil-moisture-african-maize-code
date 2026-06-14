@@ -24,7 +24,7 @@ This file is an 8-day processed panel with 1,000,127 rows. Each row represents a
 - target variable: `sif_anom`
 - energy predictors: `VPDa_8mean`, `SWa_8mean`, `Tmaxa_8mean`
 - water predictors: `SMa_L1_8mean`, `SMa_L2_8mean`, `SMa_L3_8mean`, `PPTa_8sum`
-- raw energy fields for hard-filter sensitivity: `VPD_8mean_raw`, `SW_8mean_raw`, `Tmax_8mean_raw`
+- raw energy fields: `VPD_8mean_raw`, `SW_8mean_raw`, `Tmax_8mean_raw`
 
 The figure scripts use packaged figure-ready inputs under `figure*/data/`, shared map layers under `common/map_layers/`, and supplement inputs under `supplement/data/`.
 
@@ -138,9 +138,7 @@ Expected outputs:
 - `supplement/outputs/s6_gldas_yield_sensitivity_r2.csv`
 - `supplement/outputs/s7_gldas_sif_attribution_summary.csv`
 - `supplement/outputs/s8_xgboost_model_performance.csv`
-- `supplement/outputs/s9_shapley_feature_decomposition.csv`
 - `supplement/outputs/s9_shapley_group_decomposition.csv`
-- `supplement/outputs/s9_partial_r2.csv`
 - `supplement/outputs/s10_hard_energy_filtering_sensitivity.csv`
 - `supplement/outputs/supplement_run_report.json`
 

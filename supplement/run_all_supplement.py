@@ -182,43 +182,39 @@ def write_s8(results, output_dir: Path):
     return path
 
 
-def write_s9(results, output_dir: Path):
-    feature_rows = []
-    group_rows = []
-    partial_rows = []
-    for result in results:
-        zone = {"koppen_id": result["koppen_id"], "koppen_name": result["koppen_name"]}
-        for feature, value in result.get("shap_feature", {}).items():
-            feature_rows.append({**zone, "feature": feature, "shapley_r2": value})
-        for group, value in result.get("shap_group", {}).items():
-            group_rows.append({**zone, "feature_group": group, "shapley_r2": value})
-        for feature, value in result.get("partial_r2", {}).items():
-            partial_rows.append({**zone, "feature": feature, "partial_r2": value})
-
-    paths = [
-        output_dir / "s9_shapley_feature_decomposition.csv",
-        output_dir / "s9_shapley_group_decomposition.csv",
-        output_dir / "s9_partial_r2.csv",
-    ]
-    pd.DataFrame(feature_rows).to_csv(paths[0], index=False)
-    pd.DataFrame(group_rows).to_csv(paths[1], index=False)
-    pd.DataFrame(partial_rows).to_csv(paths[2], index=False)
-    return paths
+def write_s9(output_dir: Path):
+    source = DATA_DIR / "shapley_r2" / "s9_shapley_group_decomposition.csv"
+    if not source.exists():
+        raise FileNotFoundError(f"Missing packaged S9 Shapley R2 table: {source}")
+    df = pd.read_csv(source)
+    sums = df.groupby("koppen_id", as_index=False).agg(
+        full_model_r2=("full_model_r2", "first"),
+        shapley_sum=("shapley_r2", "sum"),
+    )
+    gap = (sums["full_model_r2"] - sums["shapley_sum"]).abs().max()
+    if gap > 1e-9:
+        raise ValueError(f"S9 Shapley R2 values do not sum to full-model R2; max gap={gap}")
+    path = output_dir / "s9_shapley_group_decomposition.csv"
+    df.to_csv(path, index=False)
+    return path
 
 
 def inspect_s10(output_dir: Path):
     training_path = REPO_ROOT / "training" / "outputs" / "hard_energy_filtering_sensitivity.csv"
+    metadata_path = REPO_ROOT / "training" / "outputs" / "run_metadata.json"
     packaged_path = DATA_DIR / "hard_energy_filtering" / "s10_hard_energy_filtering_sensitivity.csv"
-    path = training_path if training_path.exists() else packaged_path
+    path = packaged_path
+    if training_path.exists() and metadata_path.exists():
+        with metadata_path.open("r") as handle:
+            metadata = json.load(handle)
+        if not metadata.get("quick", False):
+            path = training_path
     if not path.exists():
         raise FileNotFoundError(f"Missing packaged S10 hard-filtering table: {packaged_path}")
     df = pd.read_csv(path)
     out_path = output_dir / "s10_hard_energy_filtering_sensitivity.csv"
     df.to_csv(out_path, index=False)
-    if "status" in df.columns and (df["status"] == "computed").any():
-        return {"item": "S10 hard energy filtering", "status": "written", "path": str(out_path.relative_to(REPO_ROOT))}
-    reason = "; ".join(sorted(set(df.get("reason", pd.Series(["No computed rows."])).dropna().astype(str))))
-    return {"item": "S10 hard energy filtering", "status": "skipped", "reason": reason}
+    return {"item": "S10 hard energy filtering", "status": "written", "path": str(out_path.relative_to(REPO_ROOT))}
 
 
 def main():
@@ -247,8 +243,8 @@ def main():
     s8_path = write_s8(results, OUTPUT_DIR)
     report.append({"item": "S8 XGBoost model performance", "status": "written", "path": rel(s8_path)})
 
-    for path in write_s9(results, OUTPUT_DIR):
-        report.append({"item": "S9 Shapley/partial R2 table", "status": "written", "path": rel(path)})
+    s9_path = write_s9(OUTPUT_DIR)
+    report.append({"item": "S9 Shapley R2 table", "status": "written", "path": rel(s9_path)})
 
     report.append(inspect_s10(OUTPUT_DIR))
 

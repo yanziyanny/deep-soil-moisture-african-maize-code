@@ -82,39 +82,24 @@ bootstrap:
   resample_unit: held_out_rows
 
 hard_energy_filter:
-  description: "Tmax > 15 C, VPD > 0.5 kPa, SW > 200 W m-2"
+  description: "SW_8mean_raw >= 21.6 MJ m-2 day-1 and Tmax_8mean_raw >= 18 C; filter before split and retrain unweighted models"
   thresholds:
+    SW_8mean_raw:
+      label: SW
+      operator: ">="
+      value: 21.6
+      units: MJ m-2 day-1
+      aliases:
+        - SW_8mean_raw
+        - SW_raw
     Tmax_8mean_raw:
       label: Tmax
-      operator: ">"
-      value: 15
+      operator: ">="
+      value: 18
       units: C
       aliases:
         - Tmax_8mean_raw
         - Tmax_raw
-    VPD_8mean_raw:
-      label: VPD
-      operator: ">"
-      value: 0.5
-      units: kPa
-      aliases:
-        - VPD_8mean_raw
-        - VPD_raw
-        - VPD_8mean
-      alternate_if_values_look_like_hpa:
-        value: 5
-        units: hPa
-    SW_8mean_raw:
-      label: SW
-      operator: ">"
-      value: 200
-      units: W m-2
-      aliases:
-        - SW_8mean_raw
-        - SW_raw
-      alternate_if_values_look_like_mj_m2_day:
-        value: 17.28
-        units: MJ m-2 day-1
 
 shapley:
   sample_size: 0

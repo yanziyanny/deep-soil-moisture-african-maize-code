@@ -36,7 +36,7 @@ The retraining workflow writes `training/outputs/train_test_split_ids.csv` and `
 - Additional metrics: train R2, test MAE, test RMSE, cross-validation R2 summaries.
 - Ablation design: drop-column Delta R2 for individual predictors and functional groups.
 - Bootstrap CIs: bootstrap resampling of held-out rows with replacement.
-- Shapley sensitivity: Tree SHAP-derived feature and group contributions are written to the Figure 4 JSON outputs.
+- Shapley R2 sensitivity: group-level values are packaged in `supplement/data/shapley_r2/`.
 - Partial R2: single-feature XGBoost fits are reported as an additional sensitivity.
 
 ## Baseline and Sensitivity Context
@@ -45,7 +45,6 @@ No community benchmark dataset is used for this attribution task. Model evaluati
 
 - grouped held-out test performance and 5-fold grouped cross-validation;
 - drop-column and group ablation relative to the full XGBoost model;
-- single-feature partial R2 fits;
 - hard energy-filtering sensitivity;
 - GLDAS/GLEAM processed-input robustness checks in the supplement.
 
@@ -53,8 +52,7 @@ No community benchmark dataset is used for this attribution task. Model evaluati
 
 The configured hard energy thresholds are:
 
-- Tmax > 15 C.
-- VPD > 0.5 kPa.
-- SW > 200 W m-2.
+- Tmax >= 18 C.
+- SW >= 21.6 MJ m-2 day-1.
 
-The retraining code converts thresholds when the packaged raw-column range indicates an equivalent unit such as hPa for VPD or MJ m-2 day-1 for SW.
+The hard-filter sensitivity filters observations before splitting and retrains unweighted models.

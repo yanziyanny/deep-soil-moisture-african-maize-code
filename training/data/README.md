@@ -30,11 +30,11 @@ Required for: optional ML retraining.
 | `SMa_L2_8mean` | Root Water predictor | layer-2 soil moisture anomaly |
 | `SMa_L3_8mean` | Root Water predictor | layer-3 soil moisture anomaly |
 | `Tmax_8mean_raw` | hard-filter support | raw Tmax in C |
-| `VPD_8mean_raw` | hard-filter support | raw VPD; values are treated as hPa when the range indicates hPa-like units |
-| `SW_8mean_raw` | hard-filter support | raw shortwave radiation; values are treated as convertible to MJ m-2 day-1 when needed |
+| `VPD_8mean_raw` | raw energy field | raw VPD in hPa |
+| `SW_8mean_raw` | hard-filter support | raw shortwave radiation in MJ m-2 day-1 |
 
 The workflow constructs `county_year` from `admin2_idx` and `year`.
 
 ## Hard Energy Filtering
 
-The packaged panel includes the raw VPD, Tmax, and SW columns needed by the hard energy-filtering sensitivity. `training/config.yml` stores the manuscript thresholds as Tmax > 15 C, VPD > 0.5 kPa, and SW > 200 W m-2. The retraining code converts thresholds to the packaged raw-column units when the value range indicates an equivalent unit such as hPa for VPD or MJ m-2 day-1 for SW.
+The hard-filter sensitivity uses `SW_8mean_raw >= 21.6` MJ m-2 day-1 and `Tmax_8mean_raw >= 18` C, filters before splitting, and retrains unweighted models.
