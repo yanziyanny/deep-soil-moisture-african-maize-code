@@ -1,0 +1,6 @@
+koppen_id,koppen_name,status,reason,n_test_filtered,test_r2_filtered,delta_energy_filtered,delta_surface_filtered,delta_rootwater_filtered
+1,Tropical (Af/Am),computed,"Tmax_8mean_raw>15 C, VPD_8mean_raw>5 hPa, SW_8mean_raw>17.28 MJ m-2 day-1",9436,0.41286758600853213,0.08963826606530567,0.013372186432969002,0.13565885737387373
+2,Savanna (Aw),computed,"Tmax_8mean_raw>15 C, VPD_8mean_raw>5 hPa, SW_8mean_raw>17.28 MJ m-2 day-1",79845,0.29865354992723847,0.06467599802631441,0.009781955833270461,0.10048389751080844
+3,Desert (BW),computed,"Tmax_8mean_raw>15 C, VPD_8mean_raw>5 hPa, SW_8mean_raw>17.28 MJ m-2 day-1",17480,0.36605495211753225,0.05723160436235275,0.011276945809410854,0.15300891889927193
+4,Semi-arid (BS),computed,"Tmax_8mean_raw>15 C, VPD_8mean_raw>5 hPa, SW_8mean_raw>17.28 MJ m-2 day-1",34058,0.3359709454444042,0.05201575361558042,0.013798475904196805,0.13296835198362655
+5,Temperate + Med,computed,"Tmax_8mean_raw>15 C, VPD_8mean_raw>5 hPa, SW_8mean_raw>17.28 MJ m-2 day-1",28681,0.3671839407369907,0.06659607999729733,0.01189889277050682,0.15056026476332773

@@ -82,7 +82,7 @@ Full optional run from the packaged reduced 8-day training panel:
 python training/run_optional_ml_retraining.py --bootstrap-iters 1000
 ```
 
-The retraining input is `training/data/figure4_retraining_input.csv.gz`. Bootstrap, split, cross-validation, feature-group, and hard-filter settings are defined in `training/config.yml`; `bootstrap.iters` is `1000`, `bootstrap.cluster_variable` is `county_year`, and the confidence level is `0.95`. The command-line `--bootstrap-iters` value overrides the config value.
+The retraining input is `training/data/figure4_retraining_input.csv.gz`. Bootstrap, split, cross-validation, feature-group, sample-weight, and hard-filter settings are defined in `training/config.yml`. The default bootstrap setting is `bootstrap.iters: 1000`, resampling held-out rows with replacement. The command-line `--bootstrap-iters` value overrides the config value.
 
 Expected machine-readable outputs:
 
@@ -134,7 +134,7 @@ Expected outputs:
 - `supplement/outputs/s9_shapley_feature_decomposition.csv`
 - `supplement/outputs/s9_shapley_group_decomposition.csv`
 - `supplement/outputs/s9_partial_r2.csv`
-- `supplement/outputs/s10_hard_energy_filtering_sensitivity.csv` after optional ML retraining has produced `training/outputs/hard_energy_filtering_sensitivity.csv`
+- `supplement/outputs/s10_hard_energy_filtering_sensitivity.csv`
 - `supplement/outputs/supplement_run_report.json`
 
 Supplement processed inputs are listed in `DATA_DICTIONARY.md`.

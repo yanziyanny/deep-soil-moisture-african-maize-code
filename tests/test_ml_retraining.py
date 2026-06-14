@@ -1,8 +1,11 @@
 import subprocess
 import sys
+import json
 from pathlib import Path
 
 import pandas as pd
+
+from training.ml_pipeline.figure4 import load_config, prepare_data, split_grouped_stratified_by_year
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -60,3 +63,24 @@ def test_quick_retraining_outputs_and_leakage_checks(tmp_path):
     hard_filter = pd.read_csv(output_dir / "hard_energy_filtering_sensitivity.csv")
     assert "computed" in set(hard_filter["status"])
     assert hard_filter["reason"].str.contains("VPD_8mean_raw").any()
+
+
+def test_figure4_split_matches_packaged_results():
+    config = load_config(REPO_ROOT / "training/config.yml")
+    prepared = prepare_data(config, REPO_ROOT / config["data"]["input_file"])
+    zone_col = config["data"]["climate_zone_variable"]
+    group_col = config["data"]["grouping_variable"]
+    year_col = config["data"]["year_stratification_variable"]
+    for zone_id in range(1, 6):
+        zone = prepared.frame[prepared.frame[zone_col] == zone_id].copy()
+        train_mask, test_mask, _ = split_grouped_stratified_by_year(
+            zone,
+            group_col,
+            year_col,
+            float(config["test_size"]),
+            int(config["random_seed"]),
+        )
+        with (REPO_ROOT / f"figure4/data/koppen{zone_id}/results.json").open("r") as handle:
+            packaged = json.load(handle)
+        assert int(train_mask.sum()) == packaged["n_train"]
+        assert int(test_mask.sum()) == packaged["n_test"]

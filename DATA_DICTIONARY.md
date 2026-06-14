@@ -34,6 +34,7 @@ The minimum processed dataset consists of:
 | `supplement/data/gldas_yield/s5_gldas_exposure_coefficients.csv` | GLDAS Noah nonlinear yield-response coefficients | Supplementary Figure S5 | `decile`, `L1_pct`, `L2L3_pct`, `VPD_pct`, standard-error columns | percent yield change | processed summary table | supplement reproduction |
 | `supplement/data/gldas_yield/s6_gldas_r2_results.json` | GLDAS Noah yield-regression R2 summaries | Supplementary Figure S6 | `pooled_models`, `growth_stage_models`, `within_r2`, `overall_r2`, `n_observations` | R2, observation counts | processed summary JSON | supplement reproduction |
 | `supplement/data/gldas_sif/koppen*/results.json` | GLDAS Noah SIF attribution summaries by climate zone | Supplementary Figure S7 | `metrics`, `drop_group_delta`, `drop_column_delta`, `shap_feature`, `shap_group` | R2, Delta R2, attribution summaries | processed summary JSON | supplement reproduction |
+| `supplement/data/hard_energy_filtering/s10_hard_energy_filtering_sensitivity.csv` | Hard energy-filtering sensitivity summary | Supplementary Figure S10 | `status`, `n_test_filtered`, `test_r2_filtered`, `delta_*_filtered` | R2, Delta R2, observation counts | processed summary table | supplement reproduction |
 
 ## Generated Outputs
 
@@ -41,4 +42,4 @@ Generated outputs are written under `figure*/outputs/`, `training/outputs/`, and
 
 ## Supplement Inputs
 
-Supplementary Figures S3-S7 use processed inputs under `supplement/data/`. Supplementary Figures S8-S10 use the Figure 4 packaged model outputs and optional retraining outputs.
+Supplementary Figures S3-S7 and S10 use processed inputs under `supplement/data/`. Supplementary Figures S8-S9 use the Figure 4 packaged model outputs.

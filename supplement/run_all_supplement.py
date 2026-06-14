@@ -207,13 +207,11 @@ def write_s9(results, output_dir: Path):
 
 
 def inspect_s10(output_dir: Path):
-    path = REPO_ROOT / "training" / "outputs" / "hard_energy_filtering_sensitivity.csv"
+    training_path = REPO_ROOT / "training" / "outputs" / "hard_energy_filtering_sensitivity.csv"
+    packaged_path = DATA_DIR / "hard_energy_filtering" / "s10_hard_energy_filtering_sensitivity.csv"
+    path = training_path if training_path.exists() else packaged_path
     if not path.exists():
-        return {
-            "item": "S10 hard energy filtering",
-            "status": "skipped",
-            "reason": "Run optional ML retraining first to create training/outputs/hard_energy_filtering_sensitivity.csv.",
-        }
+        raise FileNotFoundError(f"Missing packaged S10 hard-filtering table: {packaged_path}")
     df = pd.read_csv(path)
     out_path = output_dir / "s10_hard_energy_filtering_sensitivity.csv"
     df.to_csv(out_path, index=False)

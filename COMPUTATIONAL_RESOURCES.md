@@ -18,8 +18,8 @@ The script writes a machine-readable benchmark report to `training/outputs/bench
 - CPU count: 10.
 - RAM: 32 GB.
 - Runtime for `python run_all_figures.py`: 20.93 s.
-- Runtime for `python training/run_optional_ml_retraining.py --quick`: 8.09 s.
-- Full optional retraining runtime with `--bootstrap-iters 1000 --no-sync-figure-data`: 92.03 s.
+- Runtime for `python training/run_optional_ml_retraining.py --quick`: 50.46 s.
+- Full optional retraining runtime with `--bootstrap-iters 1000 --no-sync-figure-data`: not re-benchmarked after the Figure 4 parity update; the command is provided in `README.md` for full local timing.
 - Full optional retraining input size: 1,000,127 rows and 22,735 county-year groups.
 
 ## Notes

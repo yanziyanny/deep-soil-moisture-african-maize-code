@@ -30,7 +30,7 @@ Quick mode reduces data size, tree count, cross-validation work, and bootstrap i
 The full command uses `training/data/figure4_retraining_input.csv.gz` and the settings in `training/config.yml`. In the config, the default bootstrap setting is:
 
 - `bootstrap.iters: 1000`
-- `bootstrap.cluster_variable: county_year`
+- `bootstrap.resample_unit: held_out_rows`
 - `bootstrap.confidence_level: 0.95`
 
 The command-line `--bootstrap-iters` argument overrides `bootstrap.iters`.
@@ -62,9 +62,13 @@ python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --no-sync-f
 
 - The split group is `county_year`, constructed from `admin2_idx` and `year`.
 - Train/test split is grouped, with all observations from the same county-year kept together.
-- Split assignment is stratified by year and climate zone.
+- Split assignment is stratified by year within each Koppen climate zone.
 - GroupKFold validation folds are assigned within each Koppen zone.
 - The workflow fails if a county-year group appears in both train and test or in more than one validation fold.
+
+## Sample Weights
+
+The Figure 4 attribution model uses the same soft energy-availability sample weights as the packaged Figure 4 outputs. The weights are defined in `training/config.yml` from `SW_8mean_raw` and `Tmax_8mean_raw`. This weighting is separate from the S10 hard energy-filtering sensitivity.
 
 ## Hard Energy Filtering
 

@@ -23,7 +23,7 @@ The packaged retraining input contains the canonical `PPTa_8sum` feature used by
 
 - Held-out split: grouped 80/20 train/test split.
 - Grouping variable: `county_year`, constructed from `admin2_idx` and `year`.
-- Stratification: by year and climate zone when the climate zone is available.
+- Stratification: by year within each Koppen climate zone.
 - Cross-validation: 5-fold `GroupKFold` within each Koppen zone.
 - Early stopping: configured in `training/config.yml`.
 - Reproducibility: all random behavior uses `random_seed` from `training/config.yml`.
@@ -32,10 +32,11 @@ The retraining workflow writes `training/outputs/train_test_split_ids.csv` and `
 
 ## Metrics and Interpretation
 
-- Primary metric: weighted held-out test R2. The packaged reduced input does not include a separate sample-weight column, so equal observation weights are used.
+- Primary metric: weighted held-out test R2.
+- Sample weights: soft energy-availability weights derived from raw shortwave radiation and maximum temperature, as configured in `training/config.yml`.
 - Additional metrics: train R2, test MAE, test RMSE, cross-validation R2 summaries.
 - Ablation design: drop-column Delta R2 for individual predictors and functional groups.
-- Bootstrap CIs: cluster bootstrap over held-out county-year groups.
+- Bootstrap CIs: bootstrap resampling of held-out rows with replacement.
 - Shapley sensitivity: Tree SHAP-derived feature and group contributions are written to the Figure 4 JSON outputs.
 - Partial R2: single-feature XGBoost fits are reported as an additional sensitivity.
 
@@ -76,7 +77,6 @@ The reduced packaged retraining panel contains raw VPD, Tmax, and SW columns for
 ## Limitations
 
 - The repository contains processed figure-ready data and a reduced ML retraining panel, not raw remote-sensing archives.
-- Equal observation weights are used because the reduced retraining panel does not include a separate weight variable.
 - Exact hard energy-filtering sensitivity depends on the documented unit conversion for raw VPD and SW thresholds in `training/config.yml`.
 - Quick mode is a smoke-test mode and should not be used for manuscript numerical values.
 - The processed panel inherits coverage, retrieval, and representativeness limits from satellite SIF, gridded meteorology, soil-moisture products, crop maps, and administrative yield data. The model should therefore be interpreted as an attribution analysis for the packaged African rainfed-maize analysis domain, not as a bias-free representation of all African cropping systems.

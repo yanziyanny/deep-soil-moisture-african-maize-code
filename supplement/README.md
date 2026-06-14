@@ -17,7 +17,7 @@ Currently supported from packaged inputs:
 - S7 GLDAS Noah SIF attribution summary table and figure copy.
 - S8 XGBoost model performance table from `figure4/data/koppen*/results.json`.
 - S9 Shapley feature/group and partial R2 tables from `figure4/data/koppen*/results.json`.
-- S10 hard energy-filtering table after optional ML retraining has produced `training/outputs/hard_energy_filtering_sensitivity.csv`.
+- S10 hard energy-filtering table from the packaged processed S10 input, or from `training/outputs/hard_energy_filtering_sensitivity.csv` if optional ML retraining has been run.
 
 Skipped items, if any required processed input is missing, are reported in `supplement/outputs/supplement_run_report.json`.
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import platform
 import sys
 import time
@@ -13,7 +12,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import yaml
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import GroupKFold
 from xgboost import XGBRegressor
 
@@ -62,7 +60,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--input", default=None, help="Override the packaged retraining input CSV")
     parser.add_argument("--outputs-dir", default=str(OUTPUT_DIR), help="Directory for machine-readable training outputs")
     parser.add_argument("--bootstrap-iters", type=int, default=None, help="Bootstrap iterations; defaults to config value")
-    parser.add_argument("--quick", action="store_true", help="Use reduced settings for CI and smoke tests")
+    parser.add_argument("--quick", action="store_true", help="Use reduced settings for smoke tests")
     parser.add_argument(
         "--sync-figure-data",
         action="store_true",
@@ -100,6 +98,60 @@ def resolve_column(columns: set[str], canonical: str, aliases: list[str] | None 
         if candidate in columns:
             return candidate
     return None
+
+
+def sigmoid_weight(series: pd.Series, threshold: float) -> np.ndarray:
+    iqr = series.quantile(0.75) - series.quantile(0.25)
+    sigma = max(float(iqr) / 2.0, 1e-3)
+    z = np.clip((series.to_numpy(dtype=float) - threshold) / sigma, -500, 500)
+    return 1.0 / (1.0 + np.exp(-z))
+
+
+def compute_sample_weight(df: pd.DataFrame, config: dict[str, Any]) -> np.ndarray:
+    weight_cfg = config.get("sample_weight", {})
+    if weight_cfg.get("method") != "energy_soft_threshold":
+        return np.ones(len(df), dtype=float)
+    sw = sigmoid_weight(pd.to_numeric(df[weight_cfg["sw_column"]], errors="coerce"), float(weight_cfg["sw_threshold"]))
+    tmax = sigmoid_weight(pd.to_numeric(df[weight_cfg["tmax_column"]], errors="coerce"), float(weight_cfg["tmax_threshold"]))
+    weights = sw * tmax
+    weights = weights / (np.nanmean(weights) + 1e-12)
+    return np.clip(weights, 1e-3, 10.0)
+
+
+def resolve_hard_filter_columns(df: pd.DataFrame, config: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    resolved: dict[str, dict[str, Any]] = {}
+    columns = set(df.columns)
+    for canonical, spec in config["hard_energy_filter"]["thresholds"].items():
+        source = resolve_column(columns, canonical, spec.get("aliases", []))
+        if source is None:
+            resolved[canonical] = {
+                "source_column": None,
+                "available": False,
+                "reason": f"Missing raw threshold column for {spec['label']}: {canonical}",
+                "threshold": spec["value"],
+                "units": spec["units"],
+            }
+            continue
+
+        threshold = spec["value"]
+        units = spec["units"]
+        values = pd.to_numeric(df[source], errors="coerce")
+        alternate = spec.get("alternate_if_values_look_like_mj_m2_day")
+        if alternate and values.max() < 100 and threshold >= 100:
+            threshold = alternate["value"]
+            units = alternate["units"]
+        alternate_hpa = spec.get("alternate_if_values_look_like_hpa")
+        if alternate_hpa and values.max() > 20 and threshold <= 2:
+            threshold = alternate_hpa["value"]
+            units = alternate_hpa["units"]
+        resolved[canonical] = {
+            "source_column": source,
+            "available": True,
+            "threshold": threshold,
+            "units": units,
+            "label": spec["label"],
+        }
+    return resolved
 
 
 def prepare_data(config: dict[str, Any], input_file: Path) -> PreparedData:
@@ -150,68 +202,45 @@ def prepare_data(config: dict[str, Any], input_file: Path) -> PreparedData:
     admin_col = data_cfg["admin_unit_variable"]
     year_col = data_cfg["year_stratification_variable"]
     group_col = data_cfg["grouping_variable"]
-    df[group_col] = df[admin_col].astype(str) + "-" + df[year_col].astype(str)
+    df[group_col] = df[admin_col].astype(str) + "_" + df[year_col].astype(str)
 
-    keep_cols = [data_cfg["target_variable"], admin_col, year_col, data_cfg["climate_zone_variable"], group_col] + features
-    weight_col = data_cfg.get("sample_weight_variable")
-    if weight_col:
-        keep_cols.append(weight_col)
-    before = len(df)
-    df = df.dropna(subset=keep_cols).copy()
-    if len(df) != before:
-        notes.append(f"Dropped {before - len(df)} rows with missing target, grouping, climate-zone, or feature values.")
+    raw_weight_cols = []
+    weight_cfg = config.get("sample_weight", {})
+    if weight_cfg.get("method") == "energy_soft_threshold":
+        raw_weight_cols = [weight_cfg["sw_column"], weight_cfg["tmax_column"]]
 
     hard_columns = resolve_hard_filter_columns(df, config)
+    hard_raw_cols = [spec["source_column"] for spec in hard_columns.values() if spec.get("source_column")]
+
+    subset_cols = [
+        data_cfg["target_variable"],
+        admin_col,
+        year_col,
+        data_cfg["climate_zone_variable"],
+        group_col,
+        *features,
+        *raw_weight_cols,
+        *hard_raw_cols,
+    ]
+    before = len(df)
+    df = df.dropna(subset=list(dict.fromkeys(subset_cols))).copy()
+    if len(df) != before:
+        notes.append(f"Dropped {before - len(df)} rows with missing target, grouping, climate-zone, feature, or raw energy values.")
+
+    df["sample_weight"] = compute_sample_weight(df, config)
     return PreparedData(df, features, feature_groups, source_columns, hard_columns, notes)
 
 
-def resolve_hard_filter_columns(df: pd.DataFrame, config: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    resolved: dict[str, dict[str, Any]] = {}
-    columns = set(df.columns)
-    for canonical, spec in config["hard_energy_filter"]["thresholds"].items():
-        source = resolve_column(columns, canonical, spec.get("aliases", []))
-        if source is None:
-            resolved[canonical] = {
-                "source_column": None,
-                "available": False,
-                "reason": f"Missing raw threshold column for {spec['label']}: {canonical}",
-                "threshold": spec["value"],
-                "units": spec["units"],
-            }
-            continue
-
-        threshold = spec["value"]
-        units = spec["units"]
-        values = pd.to_numeric(df[source], errors="coerce")
-        alternate = spec.get("alternate_if_values_look_like_mj_m2_day")
-        if alternate and values.max() < 100 and threshold >= 100:
-            threshold = alternate["value"]
-            units = alternate["units"]
-        alternate_hpa = spec.get("alternate_if_values_look_like_hpa")
-        if alternate_hpa and values.max() > 20 and threshold <= 2:
-            threshold = alternate_hpa["value"]
-            units = alternate_hpa["units"]
-        resolved[canonical] = {
-            "source_column": source,
-            "available": True,
-            "threshold": threshold,
-            "units": units,
-            "label": spec["label"],
-        }
-    return resolved
-
-
-def apply_quick_group_sample(df: pd.DataFrame, config: dict[str, Any], rng: np.random.Generator) -> pd.DataFrame:
-    quick_cfg = config.get("quick", {})
-    max_rows = int(quick_cfg.get("max_rows_per_zone", 0) or 0)
+def apply_quick_group_sample(df: pd.DataFrame, config: dict[str, Any], seed: int) -> pd.DataFrame:
+    max_rows = int(config.get("quick", {}).get("max_rows_per_zone", 0) or 0)
     if max_rows <= 0:
         return df
-
+    rng = np.random.default_rng(seed)
     zone_col = config["data"]["climate_zone_variable"]
     group_col = config["data"]["grouping_variable"]
     selected_groups: set[str] = set()
-    group_sizes = df.groupby([zone_col, group_col], sort=True).size().reset_index(name="n_rows")
-    for zone, zone_groups in group_sizes.groupby(zone_col, sort=True):
+    group_sizes = df.groupby([zone_col, group_col], sort=False).size().reset_index(name="n_rows")
+    for _, zone_groups in group_sizes.groupby(zone_col, sort=False):
         shuffled = zone_groups.sample(frac=1.0, random_state=int(rng.integers(0, 2**31 - 1)))
         cumulative = 0
         for row in shuffled.itertuples(index=False):
@@ -222,263 +251,311 @@ def apply_quick_group_sample(df: pd.DataFrame, config: dict[str, Any], rng: np.r
     return df[df[group_col].isin(selected_groups)].copy()
 
 
-def make_group_table(df: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
-    data_cfg = config["data"]
-    group_col = data_cfg["grouping_variable"]
-    admin_col = data_cfg["admin_unit_variable"]
-    year_col = data_cfg["year_stratification_variable"]
-    zone_col = data_cfg["climate_zone_variable"]
-    return (
-        df[[group_col, admin_col, year_col, zone_col]]
-        .drop_duplicates()
-        .rename(columns={group_col: "group_id", admin_col: "admin2_idx", year_col: "year", zone_col: "koppen5"})
-        .sort_values(["year", "koppen5", "admin2_idx"])
-        .reset_index(drop=True)
-    )
-
-
-def assign_train_test(groups: pd.DataFrame, config: dict[str, Any], rng: np.random.Generator) -> pd.DataFrame:
-    groups = groups.copy()
-    groups["split"] = "train"
-    test_size = float(config["test_size"])
-    strata = ["year", "koppen5"] if "koppen5" in groups.columns else ["year"]
-    for _, stratum in groups.groupby(strata, sort=True):
-        indices = stratum.index.to_numpy()
-        if len(indices) <= 1:
+def split_grouped_stratified_by_year(
+    df_zone: pd.DataFrame,
+    group_col: str,
+    year_col: str,
+    test_ratio: float,
+    seed: int,
+) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+    rng = np.random.RandomState(seed)
+    group_year = df_zone[[group_col, year_col]].drop_duplicates()
+    test_groups: list[str] = []
+    for year in group_year[year_col].unique():
+        year_groups = group_year.loc[group_year[year_col] == year, group_col].to_numpy()
+        if len(year_groups) == 0:
             continue
-        n_test = max(1, int(round(len(indices) * test_size)))
-        n_test = min(n_test, len(indices) - 1)
-        test_indices = rng.choice(indices, size=n_test, replace=False)
-        groups.loc[test_indices, "split"] = "test"
-    return groups
+        n_test = max(1, int(len(year_groups) * test_ratio))
+        if len(year_groups) > 1:
+            n_test = min(n_test, len(year_groups) - 1)
+        year_test_groups = rng.choice(year_groups, size=n_test, replace=False)
+        test_groups.extend(year_test_groups.tolist())
+
+    test_set = set(test_groups)
+    test_mask = df_zone[group_col].isin(test_set).to_numpy()
+    train_mask = ~test_mask
+    split_rows = group_year.copy()
+    split_rows["split"] = np.where(split_rows[group_col].isin(test_set), "test", "train")
+    return train_mask, test_mask, split_rows
 
 
-def assign_groupkfolds(groups: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
-    groups = groups.copy()
-    groups["validation_fold"] = pd.NA
+def assign_validation_folds(split_groups: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
+    split_groups = split_groups.copy()
+    group_col = config["data"]["grouping_variable"]
+    zone_col = config["data"]["climate_zone_variable"]
+    split_groups["validation_fold"] = pd.NA
     n_splits_config = int(config["cross_validation"]["n_splits"])
-    for zone, zone_groups in groups[groups["split"] == "train"].groupby("koppen5", sort=True):
+    for _, zone_groups in split_groups[split_groups["split"] == "train"].groupby(zone_col, sort=False):
         if len(zone_groups) < 2:
             continue
         n_splits = min(n_splits_config, len(zone_groups))
-        splitter = GroupKFold(n_splits=n_splits)
         row_positions = zone_groups.index.to_numpy()
         dummy = np.zeros(len(zone_groups))
-        group_ids = zone_groups["group_id"].to_numpy()
+        group_ids = zone_groups[group_col].to_numpy()
+        splitter = GroupKFold(n_splits=n_splits)
         for fold_idx, (_, val_pos) in enumerate(splitter.split(dummy, groups=group_ids), start=1):
-            groups.loc[row_positions[val_pos], "validation_fold"] = fold_idx
-    return groups
+            split_groups.loc[row_positions[val_pos], "validation_fold"] = fold_idx
+    return split_groups
 
 
-def validate_splits(groups: pd.DataFrame) -> None:
-    split_counts = groups.groupby("group_id")["split"].nunique()
+def validate_splits(groups: pd.DataFrame, config: dict[str, Any]) -> None:
+    group_col = config["data"]["grouping_variable"]
+    split_counts = groups.groupby(group_col)["split"].nunique()
     leaked = split_counts[split_counts > 1]
     if not leaked.empty:
         raise RuntimeError(f"Train/test leakage detected for groups: {leaked.index[:5].tolist()}")
-
-    fold_counts = groups.dropna(subset=["validation_fold"]).groupby("group_id")["validation_fold"].nunique()
+    fold_counts = groups.dropna(subset=["validation_fold"]).groupby(group_col)["validation_fold"].nunique()
     repeated = fold_counts[fold_counts > 1]
     if not repeated.empty:
         raise RuntimeError(f"GroupKFold leakage detected for groups: {repeated.index[:5].tolist()}")
 
 
-def save_split_files(groups: pd.DataFrame, outputs_dir: Path) -> None:
+def save_split_files(groups: pd.DataFrame, config: dict[str, Any], outputs_dir: Path) -> None:
     outputs_dir.mkdir(parents=True, exist_ok=True)
-    split_cols = ["group_id", "admin2_idx", "year", "koppen5", "split"]
-    fold_cols = ["group_id", "admin2_idx", "year", "koppen5", "split", "validation_fold"]
-    groups[split_cols].to_csv(outputs_dir / "train_test_split_ids.csv", index=False)
-    groups[fold_cols].to_csv(outputs_dir / "groupkfold_fold_ids.csv", index=False)
+    data_cfg = config["data"]
+    group_col = data_cfg["grouping_variable"]
+    admin_col = data_cfg["admin_unit_variable"]
+    year_col = data_cfg["year_stratification_variable"]
+    zone_col = data_cfg["climate_zone_variable"]
+    rename = {group_col: "group_id", admin_col: "admin2_idx", year_col: "year", zone_col: "koppen5"}
+    split_cols = [group_col, admin_col, year_col, zone_col, "split"]
+    fold_cols = [group_col, admin_col, year_col, zone_col, "split", "validation_fold"]
+    groups[split_cols].rename(columns=rename).to_csv(outputs_dir / "train_test_split_ids.csv", index=False)
+    groups[fold_cols].rename(columns=rename).to_csv(outputs_dir / "groupkfold_fold_ids.csv", index=False)
 
 
-def weighted_r2(y_true: np.ndarray, y_pred: np.ndarray, sample_weight: np.ndarray | None = None) -> float:
+def weighted_r2(y_true: np.ndarray, y_pred: np.ndarray, weights: np.ndarray | None = None) -> float:
     y_true = np.asarray(y_true, dtype=float)
     y_pred = np.asarray(y_pred, dtype=float)
-    if sample_weight is None:
-        sample_weight = np.ones_like(y_true, dtype=float)
-    else:
-        sample_weight = np.asarray(sample_weight, dtype=float)
-    weight_sum = np.sum(sample_weight)
-    if weight_sum <= 0 or len(y_true) == 0:
-        return float("nan")
-    y_bar = np.average(y_true, weights=sample_weight)
-    ss_tot = np.sum(sample_weight * (y_true - y_bar) ** 2)
+    if weights is None:
+        weights = np.ones_like(y_true, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    weight_sum = weights.sum()
+    if weight_sum <= 0:
+        return 0.0
+    y_mean = np.sum(weights * y_true) / (weight_sum + 1e-12)
+    ss_res = np.sum(weights * (y_true - y_pred) ** 2)
+    ss_tot = np.sum(weights * (y_true - y_mean) ** 2)
     if ss_tot <= 0:
-        return float("nan")
-    ss_res = np.sum(sample_weight * (y_true - y_pred) ** 2)
+        return 0.0
     return float(1.0 - ss_res / ss_tot)
 
 
-def model_params(config: dict[str, Any], seed: int, n_estimators: int | None = None, early_stopping: bool = False) -> dict[str, Any]:
+def weighted_mae(y_true: np.ndarray, y_pred: np.ndarray, weights: np.ndarray) -> float:
+    return float(np.sum(weights * np.abs(y_true - y_pred)) / (weights.sum() + 1e-12))
+
+
+def weighted_rmse(y_true: np.ndarray, y_pred: np.ndarray, weights: np.ndarray) -> float:
+    return float(np.sqrt(np.sum(weights * (y_true - y_pred) ** 2) / (weights.sum() + 1e-12)))
+
+
+def model_params(config: dict[str, Any], seed: int) -> dict[str, Any]:
     es = config["early_stopping"]
-    params = {
+    return {
         "objective": "reg:squarederror",
-        "n_estimators": int(n_estimators or es["n_estimators"]),
-        "learning_rate": float(es["learning_rate"]),
+        "tree_method": es.get("tree_method", "hist"),
         "max_depth": int(es["max_depth"]),
+        "learning_rate": float(es["learning_rate"]),
         "min_child_weight": float(es.get("min_child_weight", 1)),
         "subsample": float(es["subsample"]),
         "colsample_bytree": float(es["colsample_bytree"]),
         "reg_lambda": float(es.get("reg_lambda", 1.0)),
-        "tree_method": es.get("tree_method", "hist"),
+        "n_jobs": int(es.get("n_jobs", -1)),
         "random_state": int(seed),
-        "n_jobs": int(es.get("n_jobs", 1)),
-        "eval_metric": es.get("eval_metric", "rmse"),
     }
-    if early_stopping:
-        params["early_stopping_rounds"] = int(es["rounds"])
-    return params
 
 
-def fit_model(
-    X: pd.DataFrame,
-    y: pd.Series,
-    config: dict[str, Any],
-    seed: int,
-    n_estimators: int | None = None,
-    sample_weight: np.ndarray | None = None,
-) -> XGBRegressor:
-    model = XGBRegressor(**model_params(config, seed, n_estimators=n_estimators, early_stopping=False))
-    model.fit(X, y, sample_weight=sample_weight, verbose=False)
-    return model
+def find_n_fixed(df_train: pd.DataFrame, features: list[str], config: dict[str, Any], seed: int, quick: bool) -> int:
+    X = df_train[features].to_numpy()
+    y = df_train[config["data"]["target_variable"]].to_numpy()
+    weights = df_train["sample_weight"].to_numpy()
+    groups = df_train[config["data"]["grouping_variable"]].to_numpy()
+    splitter = GroupKFold(n_splits=int(config["cross_validation"]["n_splits"]))
+    best: list[int] = []
+    n_estimators = int(config["quick"]["n_estimators"] if quick else config["early_stopping"]["n_estimators"])
+    early_rounds = int(config["quick"]["early_stopping_rounds"] if quick else config["early_stopping"]["rounds"])
+    fold_limit = int(config.get("quick", {}).get("cv_folds_to_train", 0) or 0) if quick else 0
+    for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(X, y, groups), start=1):
+        if fold_limit and fold_idx > fold_limit:
+            break
+        model = XGBRegressor(
+            **model_params(config, seed),
+            n_estimators=n_estimators,
+            early_stopping_rounds=early_rounds,
+        )
+        model.fit(
+            X[train_idx],
+            y[train_idx],
+            sample_weight=weights[train_idx],
+            eval_set=[(X[val_idx], y[val_idx])],
+            sample_weight_eval_set=[weights[val_idx]],
+            verbose=False,
+        )
+        best_iteration = getattr(model, "best_iteration", None)
+        if best_iteration is not None and best_iteration >= 0:
+            best.append(int(best_iteration))
+    if not best:
+        return max(50, n_estimators)
+    return max(int(np.median(best)), 50)
 
 
-def cv_early_stopping(
-    zone_df: pd.DataFrame,
+def train_model(
+    df_train: pd.DataFrame,
+    df_test: pd.DataFrame,
     features: list[str],
     config: dict[str, Any],
-    fold_groups: pd.DataFrame,
     seed: int,
-    quick: bool,
-) -> tuple[int, dict[str, float]]:
-    target_col = config["data"]["target_variable"]
-    group_col = config["data"]["grouping_variable"]
-    fold_limit = config.get("quick", {}).get("cv_folds_to_train") if quick else None
-    fold_values = sorted(v for v in fold_groups["validation_fold"].dropna().unique())
-    if fold_limit:
-        fold_values = fold_values[: int(fold_limit)]
+    n_fixed: int | None = None,
+    quick: bool = False,
+) -> tuple[XGBRegressor, dict[str, float]]:
+    if n_fixed is None:
+        n_fixed = find_n_fixed(df_train, features, config, seed, quick)
+    target = config["data"]["target_variable"]
+    X_train = df_train[features].to_numpy()
+    y_train = df_train[target].to_numpy()
+    w_train = df_train["sample_weight"].to_numpy()
+    X_test = df_test[features].to_numpy()
+    y_test = df_test[target].to_numpy()
+    w_test = df_test["sample_weight"].to_numpy()
 
-    best_iterations: list[int] = []
-    val_scores: list[float] = []
-    for fold in fold_values:
-        val_group_ids = set(fold_groups.loc[fold_groups["validation_fold"] == fold, "group_id"])
-        val_mask = zone_df[group_col].isin(val_group_ids)
-        train_mask = ~val_mask
-        if val_mask.sum() == 0 or train_mask.sum() == 0:
-            continue
-
-        model = XGBRegressor(**model_params(config, seed + int(fold), early_stopping=True))
-        X_train = zone_df.loc[train_mask, features]
-        y_train = zone_df.loc[train_mask, target_col]
-        X_val = zone_df.loc[val_mask, features]
-        y_val = zone_df.loc[val_mask, target_col]
-        model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
-        pred = model.predict(X_val)
-        val_scores.append(weighted_r2(y_val.to_numpy(), pred))
-        best = getattr(model, "best_iteration", None)
-        if best is None:
-            best = model.get_booster().best_iteration
-        if best is not None and best >= 0:
-            best_iterations.append(int(best) + 1)
-
-    configured_estimators = int(config["early_stopping"]["n_estimators"])
-    if quick:
-        configured_estimators = int(config["quick"]["n_estimators"])
-    if best_iterations:
-        final_estimators = max(10, min(configured_estimators, int(np.median(best_iterations))))
-    else:
-        final_estimators = configured_estimators
-
-    cv_summary = {
-        "cv_folds_trained": float(len(val_scores)),
-        "cv_mean_r2": float(np.nanmean(val_scores)) if val_scores else float("nan"),
-        "cv_std_r2": float(np.nanstd(val_scores)) if val_scores else float("nan"),
-        "best_iteration_median": float(np.median(best_iterations)) if best_iterations else float("nan"),
+    model = XGBRegressor(**model_params(config, seed), n_estimators=int(n_fixed))
+    model.fit(X_train, y_train, sample_weight=w_train, verbose=False)
+    train_pred = model.predict(X_train)
+    test_pred = model.predict(X_test)
+    metrics = {
+        "n_fixed": int(n_fixed),
+        "train_r2": weighted_r2(y_train, train_pred, w_train),
+        "test_r2": weighted_r2(y_test, test_pred, w_test),
+        "test_mae": weighted_mae(y_test, test_pred, w_test),
+        "test_rmse": weighted_rmse(y_test, test_pred, w_test),
     }
-    return final_estimators, cv_summary
+    return model, metrics
 
 
-def bootstrap_delta_stats(
+def bootstrap_stats(
     y_true: np.ndarray,
+    weights: np.ndarray,
     baseline_pred: np.ndarray,
     alternate_predictions: dict[str, np.ndarray],
-    actual_deltas: dict[str, float],
-    group_ids: np.ndarray,
     bootstrap_iters: int,
     seed: int,
 ) -> dict[str, dict[str, float]]:
-    if bootstrap_iters <= 0:
-        return {
-            key: {"mean": float(delta), "std": float("nan"), "ci_low": float("nan"), "ci_high": float("nan")}
-            for key, delta in actual_deltas.items()
-        }
-
-    rng = np.random.default_rng(seed)
-    unique_groups = pd.unique(group_ids)
-    positions_by_group = {group: np.flatnonzero(group_ids == group) for group in unique_groups}
+    rng = np.random.RandomState(seed)
+    n_test = len(y_true)
     draws: dict[str, list[float]] = {key: [] for key in alternate_predictions}
+    if bootstrap_iters <= 0:
+        baseline_r2 = weighted_r2(y_true, baseline_pred, weights)
+        return {
+            key: {
+                "mean": float(baseline_r2 - weighted_r2(y_true, pred, weights)),
+                "std": float("nan"),
+                "ci_low": float("nan"),
+                "ci_high": float("nan"),
+            }
+            for key, pred in alternate_predictions.items()
+        }
     for _ in range(bootstrap_iters):
-        sampled_groups = rng.choice(unique_groups, size=len(unique_groups), replace=True)
-        positions = np.concatenate([positions_by_group[group] for group in sampled_groups])
-        base_r2 = weighted_r2(y_true[positions], baseline_pred[positions])
+        boot_idx = rng.choice(n_test, size=n_test, replace=True)
+        y_boot = y_true[boot_idx]
+        w_boot = weights[boot_idx]
+        baseline_r2 = weighted_r2(y_boot, baseline_pred[boot_idx], w_boot)
         for key, pred in alternate_predictions.items():
-            draws[key].append(base_r2 - weighted_r2(y_true[positions], pred[positions]))
-
+            draws[key].append(baseline_r2 - weighted_r2(y_boot, pred[boot_idx], w_boot))
     stats: dict[str, dict[str, float]] = {}
     for key, values in draws.items():
         arr = np.asarray(values, dtype=float)
         stats[key] = {
-            "mean": float(actual_deltas[key]),
-            "std": float(np.nanstd(arr, ddof=1)) if len(arr) > 1 else float("nan"),
-            "ci_low": float(np.nanpercentile(arr, 2.5)),
-            "ci_high": float(np.nanpercentile(arr, 97.5)),
+            "mean": float(np.mean(arr)),
+            "std": float(np.std(arr)),
+            "ci_low": float(np.percentile(arr, 2.5)),
+            "ci_high": float(np.percentile(arr, 97.5)),
         }
     return stats
 
 
-def compute_shapley_summary(
-    model: XGBRegressor,
-    X_test: pd.DataFrame,
-    baseline_r2: float,
-    feature_groups: dict[str, list[str]],
-    sample_size: int,
-    seed: int,
-) -> tuple[dict[str, float], dict[str, float]]:
-    if len(X_test) == 0:
-        return {col: 0.0 for col in X_test.columns}, {group: 0.0 for group in feature_groups}
-    if len(X_test) > sample_size:
-        sampled = X_test.sample(n=sample_size, random_state=seed)
-    else:
-        sampled = X_test
+def compute_shap(model: XGBRegressor, df_train: pd.DataFrame, df_test: pd.DataFrame, features: list[str], feature_groups: dict[str, list[str]], config: dict[str, Any], quick: bool) -> tuple[dict[str, float], dict[str, float]]:
+    sample_size = int(config.get("shapley", {}).get("sample_size", 0) or 0)
+    if quick:
+        sample_size = int(config.get("quick", {}).get("shap_sample_size", 500))
+    if sample_size > 0 and len(df_test) > sample_size:
+        df_test = df_test.sample(n=sample_size, random_state=int(config["random_seed"]))
     try:
         import shap
 
-        explainer = shap.TreeExplainer(model)
-        values = explainer.shap_values(sampled)
-        mean_abs = np.abs(np.asarray(values)).mean(axis=0)
+        explainer = shap.TreeExplainer(
+            model,
+            data=df_train[features].to_numpy(),
+            feature_perturbation="interventional",
+        )
+        shap_vals = explainer.shap_values(df_test[features].to_numpy())
+        weights = df_test["sample_weight"].to_numpy()
+        mean_abs = np.average(np.abs(shap_vals), axis=0, weights=weights)
     except Exception:
         mean_abs = np.asarray(model.feature_importances_, dtype=float)
-
-    if mean_abs.sum() > 0 and math.isfinite(baseline_r2):
-        feature_values = {
-            feature: float(max(baseline_r2, 0.0) * value / mean_abs.sum())
-            for feature, value in zip(sampled.columns, mean_abs)
-        }
-    else:
-        feature_values = {feature: 0.0 for feature in sampled.columns}
+    feature_values = {feature: float(value) for feature, value in zip(features, mean_abs)}
     group_values = {
-        group: float(sum(feature_values.get(feature, 0.0) for feature in features))
-        for group, features in feature_groups.items()
+        group: float(sum(feature_values.get(feature, 0.0) for feature in group_features))
+        for group, group_features in feature_groups.items()
     }
     return feature_values, group_values
 
 
+def compute_partial_r2(df_train: pd.DataFrame, features: list[str], config: dict[str, Any], seed: int, quick: bool) -> dict[str, float]:
+    splitter = GroupKFold(n_splits=int(config["cross_validation"]["n_splits"]))
+    target = config["data"]["target_variable"]
+    group_col = config["data"]["grouping_variable"]
+    X = df_train[features].to_numpy()
+    y = df_train[target].to_numpy()
+    weights = df_train["sample_weight"].to_numpy()
+    groups = df_train[group_col].to_numpy()
+    n_estimators = 80 if quick else 200
+    partial: dict[str, float] = {}
+    for var in features:
+        others = [feature for feature in features if feature != var]
+        if not others:
+            partial[var] = 0.0
+            continue
+        y_resid = np.zeros_like(y, dtype=float)
+        x_resid = np.zeros_like(y, dtype=float)
+        for fold_idx, (train_idx, test_idx) in enumerate(splitter.split(X, y, groups), start=1):
+            model_y = XGBRegressor(**model_params(config, seed + fold_idx), n_estimators=n_estimators)
+            model_y.fit(
+                df_train.iloc[train_idx][others].to_numpy(),
+                y[train_idx],
+                sample_weight=weights[train_idx],
+                verbose=False,
+            )
+            y_resid[test_idx] = y[test_idx] - model_y.predict(df_train.iloc[test_idx][others].to_numpy())
+
+            model_x = XGBRegressor(**model_params(config, seed + 100 + fold_idx), n_estimators=n_estimators)
+            model_x.fit(
+                df_train.iloc[train_idx][others].to_numpy(),
+                df_train.iloc[train_idx][var].to_numpy(),
+                sample_weight=weights[train_idx],
+                verbose=False,
+            )
+            x_resid[test_idx] = df_train.iloc[test_idx][var].to_numpy() - model_x.predict(df_train.iloc[test_idx][others].to_numpy())
+
+        y_mean = np.sum(weights * y_resid) / (weights.sum() + 1e-12)
+        x_mean = np.sum(weights * x_resid) / (weights.sum() + 1e-12)
+        cov = np.sum(weights * (y_resid - y_mean) * (x_resid - x_mean))
+        var_y = np.sum(weights * (y_resid - y_mean) ** 2)
+        var_x = np.sum(weights * (x_resid - x_mean) ** 2)
+        if var_y <= 0 or var_x <= 0:
+            partial[var] = 0.0
+        else:
+            corr = cov / np.sqrt(var_y * var_x)
+            partial[var] = max(0.0, float(corr**2))
+    return partial
+
+
 def compute_hard_filter_rows(
     zone_id: int,
-    zone_test: pd.DataFrame,
-    y_test: np.ndarray,
+    df_test: pd.DataFrame,
     baseline_pred: np.ndarray,
     drop_group_predictions: dict[str, np.ndarray],
     hard_columns: dict[str, dict[str, Any]],
+    config: dict[str, Any],
 ) -> list[dict[str, Any]]:
     missing = [spec["reason"] for spec in hard_columns.values() if not spec.get("available")]
     if missing:
@@ -496,12 +573,12 @@ def compute_hard_filter_rows(
             }
         ]
 
-    mask = np.ones(len(zone_test), dtype=bool)
+    mask = np.ones(len(df_test), dtype=bool)
     threshold_notes = []
     for spec in hard_columns.values():
         source = spec["source_column"]
         threshold = spec["threshold"]
-        mask &= pd.to_numeric(zone_test[source], errors="coerce").to_numpy() > threshold
+        mask &= pd.to_numeric(df_test[source], errors="coerce").to_numpy() > threshold
         threshold_notes.append(f"{source}>{threshold} {spec['units']}")
 
     if mask.sum() < 5:
@@ -519,7 +596,10 @@ def compute_hard_filter_rows(
             }
         ]
 
-    base_r2 = weighted_r2(y_test[mask], baseline_pred[mask])
+    target = config["data"]["target_variable"]
+    y_test = df_test[target].to_numpy()
+    weights = df_test["sample_weight"].to_numpy()
+    base_r2 = weighted_r2(y_test[mask], baseline_pred[mask], weights[mask])
     return [
         {
             "koppen_id": zone_id,
@@ -528,9 +608,9 @@ def compute_hard_filter_rows(
             "reason": ", ".join(threshold_notes),
             "n_test_filtered": int(mask.sum()),
             "test_r2_filtered": base_r2,
-            "delta_energy_filtered": base_r2 - weighted_r2(y_test[mask], drop_group_predictions["Energy"][mask]),
-            "delta_surface_filtered": base_r2 - weighted_r2(y_test[mask], drop_group_predictions["SurfaceWater"][mask]),
-            "delta_rootwater_filtered": base_r2 - weighted_r2(y_test[mask], drop_group_predictions["RootWater"][mask]),
+            "delta_energy_filtered": base_r2 - weighted_r2(y_test[mask], drop_group_predictions["Energy"][mask], weights[mask]),
+            "delta_surface_filtered": base_r2 - weighted_r2(y_test[mask], drop_group_predictions["SurfaceWater"][mask], weights[mask]),
+            "delta_rootwater_filtered": base_r2 - weighted_r2(y_test[mask], drop_group_predictions["RootWater"][mask], weights[mask]),
         }
     ]
 
@@ -538,7 +618,6 @@ def compute_hard_filter_rows(
 def run_zone(
     zone_id: int,
     df: pd.DataFrame,
-    groups: pd.DataFrame,
     prepared: PreparedData,
     config: dict[str, Any],
     bootstrap_iters: int,
@@ -546,113 +625,65 @@ def run_zone(
     seed: int,
 ) -> dict[str, Any]:
     data_cfg = config["data"]
-    target_col = data_cfg["target_variable"]
-    group_col = data_cfg["grouping_variable"]
     zone_col = data_cfg["climate_zone_variable"]
+    group_col = data_cfg["grouping_variable"]
+    year_col = data_cfg["year_stratification_variable"]
+    target = data_cfg["target_variable"]
+    features = prepared.features
 
-    zone_df = df[df[zone_col] == zone_id].copy()
-    zone_group_ids = set(zone_df[group_col])
-    zone_groups = groups[groups["group_id"].isin(zone_group_ids)].copy()
-    train_group_ids = set(zone_groups.loc[zone_groups["split"] == "train", "group_id"])
-    test_group_ids = set(zone_groups.loc[zone_groups["split"] == "test", "group_id"])
+    df_zone = df[df[zone_col] == zone_id].copy()
+    train_mask, test_mask, split_groups = split_grouped_stratified_by_year(
+        df_zone,
+        group_col,
+        year_col,
+        float(config["test_size"]),
+        seed=int(config["random_seed"]),
+    )
+    split_groups[data_cfg["admin_unit_variable"]] = split_groups[group_col].str.split("_").str[0].astype(df_zone[data_cfg["admin_unit_variable"]].dtype)
+    split_groups[zone_col] = zone_id
 
-    train_df = zone_df[zone_df[group_col].isin(train_group_ids)]
-    test_df = zone_df[zone_df[group_col].isin(test_group_ids)]
-    if train_df.empty or test_df.empty:
+    df_train = df_zone[train_mask].copy()
+    df_test = df_zone[test_mask].copy()
+    if df_train.empty or df_test.empty:
         raise RuntimeError(f"Koppen zone {zone_id} has empty train or test partition.")
 
-    features = prepared.features
-    final_estimators, cv_summary = cv_early_stopping(train_df, features, config, zone_groups, seed, quick)
-    baseline_model = fit_model(train_df[features], train_df[target_col], config, seed, n_estimators=final_estimators)
-    train_pred = baseline_model.predict(train_df[features])
-    test_pred = baseline_model.predict(test_df[features])
-    y_train = train_df[target_col].to_numpy()
-    y_test = test_df[target_col].to_numpy()
-    baseline_train_r2 = weighted_r2(y_train, train_pred)
-    baseline_test_r2 = weighted_r2(y_test, test_pred)
+    baseline_model, metrics = train_model(df_train, df_test, features, config, seed, quick=quick)
+    y_test = df_test[target].to_numpy()
+    weights = df_test["sample_weight"].to_numpy()
+    baseline_pred = baseline_model.predict(df_test[features].to_numpy())
 
-    metrics = {
-        "n_fixed": int(train_df[group_col].nunique()),
-        "train_r2": baseline_train_r2,
-        "test_r2": baseline_test_r2,
-        "test_mae": float(mean_absolute_error(y_test, test_pred)),
-        "test_rmse": float(mean_squared_error(y_test, test_pred, squared=False)),
-    }
-
-    drop_column_delta: dict[str, float] = {}
+    drop_column_predictions: dict[str, np.ndarray] = {}
     drop_column_r2: dict[str, float] = {}
-    drop_column_pred: dict[str, np.ndarray] = {}
-    for index, feature in enumerate(features):
+    for feature in features:
         keep = [col for col in features if col != feature]
-        model = fit_model(train_df[keep], train_df[target_col], config, seed + 100 + index, n_estimators=final_estimators)
-        pred = model.predict(test_df[keep])
-        r2 = weighted_r2(y_test, pred)
-        drop_column_r2[feature] = r2
-        drop_column_delta[feature] = baseline_test_r2 - r2
-        drop_column_pred[feature] = pred
+        model, _ = train_model(df_train, df_test, keep, config, seed, n_fixed=int(metrics["n_fixed"]), quick=quick)
+        pred = model.predict(df_test[keep].to_numpy())
+        drop_column_predictions[feature] = pred
+        drop_column_r2[feature] = weighted_r2(y_test, pred, weights)
 
-    drop_group_delta: dict[str, float] = {}
+    drop_group_predictions: dict[str, np.ndarray] = {}
     drop_group_r2: dict[str, float] = {}
-    drop_group_pred: dict[str, np.ndarray] = {}
-    for index, (group, group_features) in enumerate(prepared.feature_groups.items()):
+    for group, group_features in prepared.feature_groups.items():
         keep = [col for col in features if col not in group_features]
-        model = fit_model(train_df[keep], train_df[target_col], config, seed + 200 + index, n_estimators=final_estimators)
-        pred = model.predict(test_df[keep])
-        r2 = weighted_r2(y_test, pred)
-        drop_group_r2[group] = r2
-        drop_group_delta[group] = baseline_test_r2 - r2
-        drop_group_pred[group] = pred
+        model, _ = train_model(df_train, df_test, keep, config, seed, n_fixed=int(metrics["n_fixed"]), quick=quick)
+        pred = model.predict(df_test[keep].to_numpy())
+        drop_group_predictions[group] = pred
+        drop_group_r2[group] = weighted_r2(y_test, pred, weights)
 
-    column_bootstrap = bootstrap_delta_stats(
-        y_test,
-        test_pred,
-        drop_column_pred,
-        drop_column_delta,
-        test_df[group_col].to_numpy(),
-        bootstrap_iters,
-        seed + 300,
-    )
-    group_bootstrap = bootstrap_delta_stats(
-        y_test,
-        test_pred,
-        drop_group_pred,
-        drop_group_delta,
-        test_df[group_col].to_numpy(),
-        bootstrap_iters,
-        seed + 400,
-    )
+    column_bootstrap = bootstrap_stats(y_test, weights, baseline_pred, drop_column_predictions, bootstrap_iters, seed=int(config["random_seed"]))
+    group_bootstrap = bootstrap_stats(y_test, weights, baseline_pred, drop_group_predictions, bootstrap_iters, seed=int(config["random_seed"]))
+    drop_column_delta = {feature: stats["mean"] for feature, stats in column_bootstrap.items()}
+    drop_group_delta = {group: stats["mean"] for group, stats in group_bootstrap.items()}
 
-    shap_sample_size = int(config.get("shapley", {}).get("sample_size", 5000))
-    if quick:
-        shap_sample_size = int(config.get("quick", {}).get("shap_sample_size", min(500, shap_sample_size)))
-    shap_feature, shap_group = compute_shapley_summary(
-        baseline_model,
-        test_df[features],
-        baseline_test_r2,
-        prepared.feature_groups,
-        shap_sample_size,
-        seed + 500,
-    )
-
-    partial_r2: dict[str, float] = {}
-    for index, feature in enumerate(features):
-        model = fit_model(
-            train_df[[feature]],
-            train_df[target_col],
-            config,
-            seed + 600 + index,
-            n_estimators=max(10, min(final_estimators, int(config.get("quick", {}).get("n_estimators", final_estimators)) if quick else final_estimators)),
-        )
-        pred = model.predict(test_df[[feature]])
-        partial_r2[feature] = weighted_r2(y_test, pred)
-
-    hard_rows = compute_hard_filter_rows(zone_id, test_df, y_test, test_pred, drop_group_pred, prepared.hard_filter_columns)
+    shap_feature, shap_group = compute_shap(baseline_model, df_train, df_test, features, prepared.feature_groups, config, quick)
+    partial_r2 = compute_partial_r2(df_train, features, config, seed, quick)
+    hard_rows = compute_hard_filter_rows(zone_id, df_test, baseline_pred, drop_group_predictions, prepared.hard_filter_columns, config)
 
     result_json = {
         "koppen_id": int(zone_id),
-        "koppen_name": KOPPEN_NAMES.get(int(zone_id), str(zone_id)),
-        "n_train": int(len(train_df)),
-        "n_test": int(len(test_df)),
+        "koppen_name": KOPPEN_NAMES[int(zone_id)],
+        "n_train": int(len(df_train)),
+        "n_test": int(len(df_test)),
         "metrics": metrics,
         "drop_group_delta": drop_group_delta,
         "drop_group_bootstrap": group_bootstrap,
@@ -662,12 +693,10 @@ def run_zone(
         "shap_group": shap_group,
         "partial_r2": partial_r2,
     }
-
     return {
         "zone_id": int(zone_id),
         "result_json": result_json,
-        "cv_summary": cv_summary,
-        "final_estimators": final_estimators,
+        "split_groups": split_groups,
         "drop_column_r2": drop_column_r2,
         "drop_group_r2": drop_group_r2,
         "hard_filter_rows": hard_rows,
@@ -677,7 +706,7 @@ def run_zone(
 def write_artifacts(
     zone_outputs: list[dict[str, Any]],
     prepared: PreparedData,
-    groups: pd.DataFrame,
+    split_groups: pd.DataFrame,
     config: dict[str, Any],
     outputs_dir: Path,
     sync_figure_data: bool,
@@ -686,6 +715,10 @@ def write_artifacts(
     outputs_dir.mkdir(parents=True, exist_ok=True)
     figure_output_root = outputs_dir / "figure4_data"
     figure_output_root.mkdir(parents=True, exist_ok=True)
+
+    split_groups = assign_validation_folds(split_groups, config)
+    validate_splits(split_groups, config)
+    save_split_files(split_groups, config, outputs_dir)
 
     metrics_rows = []
     drop_individual_rows = []
@@ -705,16 +738,11 @@ def write_artifacts(
                 "koppen_name": zone_name,
                 "n_train": result["n_train"],
                 "n_test": result["n_test"],
-                "n_train_groups": metrics["n_fixed"],
+                "n_fixed": metrics["n_fixed"],
                 "train_r2": metrics["train_r2"],
                 "test_r2": metrics["test_r2"],
                 "test_mae": metrics["test_mae"],
                 "test_rmse": metrics["test_rmse"],
-                "cv_mean_r2": zone_output["cv_summary"]["cv_mean_r2"],
-                "cv_std_r2": zone_output["cv_summary"]["cv_std_r2"],
-                "cv_folds_trained": zone_output["cv_summary"]["cv_folds_trained"],
-                "best_iteration_median": zone_output["cv_summary"]["best_iteration_median"],
-                "final_n_estimators": zone_output["final_estimators"],
             }
         )
 
@@ -795,13 +823,14 @@ def write_artifacts(
         zone_dir = figure_output_root / f"koppen{zone_id}"
         zone_dir.mkdir(parents=True, exist_ok=True)
         with (zone_dir / "results.json").open("w") as handle:
-            json.dump(result, handle, indent=2, sort_keys=True)
+            json.dump(result, handle, indent=2)
 
     pd.DataFrame(metrics_rows).to_csv(outputs_dir / "model_metrics_by_zone.csv", index=False)
     pd.DataFrame(drop_individual_rows).to_csv(outputs_dir / "drop_column_importance_individual.csv", index=False)
     pd.DataFrame(drop_group_rows).to_csv(outputs_dir / "drop_column_importance_group.csv", index=False)
     pd.DataFrame(bootstrap_rows).to_csv(outputs_dir / "bootstrap_confidence_intervals.csv", index=False)
-    pd.DataFrame(hard_rows).to_csv(outputs_dir / "hard_energy_filtering_sensitivity.csv", index=False)
+    hard_table = pd.DataFrame(hard_rows)
+    hard_table.to_csv(outputs_dir / "hard_energy_filtering_sensitivity.csv", index=False)
     summary = pd.DataFrame(summary_rows).sort_values("koppen_id")
     summary.to_csv(figure_output_root / "summary.csv", index=False)
 
@@ -820,7 +849,7 @@ def write_artifacts(
     metadata["schema_notes"] = prepared.notes
     metadata["feature_source_columns"] = prepared.source_columns
     metadata["hard_filter_columns"] = prepared.hard_filter_columns
-    metadata["split_summary"] = groups["split"].value_counts().to_dict()
+    metadata["split_summary"] = split_groups["split"].value_counts().to_dict()
     with (outputs_dir / "run_metadata.json").open("w") as handle:
         json.dump(metadata, handle, indent=2, sort_keys=True)
 
@@ -832,7 +861,7 @@ def write_artifacts(
             destination = FIGURE4_DATA_DIR / f"koppen{zone_id}" / "results.json"
             destination.parent.mkdir(parents=True, exist_ok=True)
             with destination.open("w") as handle:
-                json.dump(zone_output["result_json"], handle, indent=2, sort_keys=True)
+                json.dump(zone_output["result_json"], handle, indent=2)
 
 
 def run_pipeline(
@@ -846,7 +875,6 @@ def run_pipeline(
     start = time.perf_counter()
     config = load_config(config_path)
     seed = int(config["random_seed"])
-    rng = np.random.default_rng(seed)
     if input_file is None:
         input_file = REPO_ROOT / config["data"]["input_file"]
     elif not input_file.is_absolute():
@@ -854,37 +882,22 @@ def run_pipeline(
 
     if bootstrap_iters is None:
         bootstrap_iters = int(config["bootstrap"]["iters"])
-    if quick:
-        bootstrap_iters = int(config["quick"]["bootstrap_iters"]) if bootstrap_iters == int(config["bootstrap"]["iters"]) else bootstrap_iters
-        config["early_stopping"]["n_estimators"] = int(config["quick"]["n_estimators"])
-        config["early_stopping"]["rounds"] = int(config["quick"]["early_stopping_rounds"])
+    if quick and bootstrap_iters == int(config["bootstrap"]["iters"]):
+        bootstrap_iters = int(config["quick"]["bootstrap_iters"])
 
     prepared = prepare_data(config, input_file)
     df = prepared.frame
     if quick:
-        df = apply_quick_group_sample(df, config, rng)
-
-    groups = make_group_table(df, config)
-    groups = assign_train_test(groups, config, rng)
-    groups = assign_groupkfolds(groups, config)
-    validate_splits(groups)
-    save_split_files(groups, outputs_dir)
+        df = apply_quick_group_sample(df, config, seed)
 
     zone_outputs = []
+    split_frames = []
     for zone_id in sorted(df[config["data"]["climate_zone_variable"]].dropna().unique()):
         print(f"[retrain_figure4] Training Koppen zone {int(zone_id)}")
-        zone_outputs.append(
-            run_zone(
-                int(zone_id),
-                df,
-                groups,
-                prepared,
-                config,
-                bootstrap_iters,
-                quick,
-                seed + int(zone_id) * 1000,
-            )
-        )
+        output = run_zone(int(zone_id), df, prepared, config, int(bootstrap_iters), quick, seed)
+        zone_outputs.append(output)
+        split_frames.append(output["split_groups"])
+    split_groups = pd.concat(split_frames, ignore_index=True)
 
     metadata = {
         "quick": bool(quick),
@@ -892,7 +905,7 @@ def run_pipeline(
         "random_seed": seed,
         "input_file": str(input_file.relative_to(REPO_ROOT) if input_file.is_relative_to(REPO_ROOT) else input_file),
         "n_rows": int(len(df)),
-        "n_groups": int(groups["group_id"].nunique()),
+        "n_groups": int(split_groups[config["data"]["grouping_variable"]].nunique()),
         "test_size": float(config["test_size"]),
         "grouping_variable": config["data"]["grouping_variable"],
         "year_stratification_variable": config["data"]["year_stratification_variable"],
@@ -903,12 +916,12 @@ def run_pipeline(
         "platform": platform.platform(),
         "runtime_seconds": float(time.perf_counter() - start),
     }
-    write_artifacts(zone_outputs, prepared, groups, config, outputs_dir, sync_figure_data, metadata)
+    write_artifacts(zone_outputs, prepared, split_groups, config, outputs_dir, sync_figure_data, metadata)
     print(f"[retrain_figure4] Wrote machine-readable outputs to {outputs_dir}")
     if sync_figure_data:
         print("[retrain_figure4] Synced Figure 4 packaged outputs to figure4/data")
     else:
-        print("[retrain_figure4] Figure 4 packaged outputs were left unchanged; generated copies are in training/outputs/figure4_data")
+        print(f"[retrain_figure4] Figure 4 packaged outputs were left unchanged; generated copies are in {outputs_dir / 'figure4_data'}")
 
 
 def run_from_args(args: argparse.Namespace) -> None:
