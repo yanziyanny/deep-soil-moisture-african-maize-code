@@ -1,6 +1,6 @@
 # Data Dictionary
 
-This repository contains processed figure-ready data and an analysis-ready 8-day ML retraining panel. It does not contain full raw remote-sensing archives.
+This file lists the packaged inputs used by the figure, supplement, and optional retraining commands.
 
 ## Analysis-Ready Dataset
 
@@ -38,8 +38,4 @@ The packaged analysis-ready dataset consists of:
 
 ## Generated Outputs
 
-Generated outputs are written under `figure*/outputs/`, `training/outputs/`, and `supplement/outputs/`. These are reproducible products and are not required as source inputs for the default workflow.
-
-## Supplement Inputs
-
-Supplementary Figures S3-S7 and S10 use processed inputs under `supplement/data/`. Supplementary Figures S8-S9 use the Figure 4 packaged model outputs.
+Generated outputs are written under `figure*/outputs/`, `training/outputs/`, and `supplement/outputs/`.

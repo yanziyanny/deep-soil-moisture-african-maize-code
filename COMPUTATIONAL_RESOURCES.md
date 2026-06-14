@@ -1,6 +1,6 @@
 # Computational Resources
 
-This file records the computing information requested by the Nature Portfolio machine-learning checklist.
+Recorded benchmark environment and commands.
 
 Run:
 
@@ -10,7 +10,7 @@ python scripts/benchmark_runtime.py
 
 The script writes a machine-readable benchmark report to `training/outputs/benchmark_runtime.json`.
 
-## Author-Filled Benchmark Summary
+## Recorded Environment
 
 - Hardware: Apple Silicon workstation, arm64.
 - Operating system: macOS-26.1-arm64.
@@ -19,11 +19,10 @@ The script writes a machine-readable benchmark report to `training/outputs/bench
 - RAM: 32 GB.
 - Runtime for `python run_all_figures.py`: 20.93 s.
 - Runtime for `python training/run_optional_ml_retraining.py --quick`: 50.46 s.
-- Full optional retraining runtime with `--bootstrap-iters 1000 --no-sync-figure-data`: not re-benchmarked after the Figure 4 parity update; the command is provided in `README.md` for full local timing.
 - Full optional retraining input size: 1,000,127 rows and 22,735 county-year groups.
 
-## Notes
+## Benchmark Commands
 
-- Full optional ML retraining is expected to be heavier than default figure reproduction.
-- The benchmark helper records package versions and command return codes.
-- If full figure rendering is not run, record the command that was timed.
+- Main figures: `python run_all_figures.py`
+- Optional quick retraining: `python training/run_optional_ml_retraining.py --quick`
+- Optional full retraining: `python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --no-sync-figure-data`

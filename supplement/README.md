@@ -1,6 +1,6 @@
-# Supplement Reproduction Support
+# Supplement Reproduction
 
-This directory contains lightweight scripts for supplement figures and tables that can be reproduced from packaged processed inputs.
+This directory contains scripts and packaged inputs for reproducing supplement summary tables and copied figure panels.
 
 Run:
 
@@ -8,7 +8,7 @@ Run:
 python supplement/run_all_supplement.py --quick
 ```
 
-Currently supported from packaged inputs:
+Outputs:
 
 - S3 GLEAM SM-VPD coupling summary table and figure copy.
 - S4 GLDAS Noah SM-VPD coupling summary table and figure copy.
@@ -17,8 +17,5 @@ Currently supported from packaged inputs:
 - S7 GLDAS Noah SIF attribution summary table and figure copy.
 - S8 XGBoost model performance table from `figure4/data/koppen*/results.json`.
 - S9 Shapley feature/group and partial R2 tables from `figure4/data/koppen*/results.json`.
-- S10 hard energy-filtering table from the packaged processed S10 input, or from `training/outputs/hard_energy_filtering_sensitivity.csv` if optional ML retraining has been run.
-
-Skipped items, if any required processed input is missing, are reported in `supplement/outputs/supplement_run_report.json`.
-
-The S3-S7 outputs use processed arrays, CSV/JSON summaries, and figure-ready images under `supplement/data/`; they do not require raw GLDAS, GLEAM, or remote-sensing archives.
+- S10 hard energy-filtering table from `supplement/data/hard_energy_filtering/` or from `training/outputs/hard_energy_filtering_sensitivity.csv` if optional ML retraining has been run.
+- `supplement/outputs/supplement_run_report.json`.

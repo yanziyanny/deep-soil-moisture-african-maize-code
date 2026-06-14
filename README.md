@@ -1,16 +1,16 @@
 # Deep soil moisture reveals hidden water stress in African rainfed maize systems
 
-This repository contains code and analysis-ready processed data required to reproduce the submitted figures, supplement summaries, and Figure 4 machine-learning retraining for the manuscript *Deep soil moisture reveals hidden water stress in African rainfed maize systems*.
+This repository contains code and analysis-ready processed data for reproducing the submitted figures, supplement summaries, and Figure 4 machine-learning retraining for the manuscript *Deep soil moisture reveals hidden water stress in African rainfed maize systems*.
 
-## Repository Purpose
+## Contents
 
-The repository includes:
-
-- one plotting script for each main-text figure
-- processed figure-ready inputs required to regenerate the final figures
-- a top-level `run_all_figures.py` entry point
-- optional XGBoost retraining support for the Figure 4 attribution analysis
-- split/fold leakage checks, a model card, supplement table support, tests, and smoke checks
+- `figure*/`: main-text figure scripts and packaged figure inputs.
+- `common/map_layers/`: shared map inputs.
+- `supplement/`: supplement table and figure-copy reproduction.
+- `training/`: optional Figure 4 XGBoost retraining workflow.
+- `DATA_DICTIONARY.md`: packaged input file descriptions.
+- `MODEL_CARD.md`: Figure 4 model, split, metric, and baseline details.
+- `COMPUTATIONAL_RESOURCES.md`: recorded benchmark environment.
 
 ## Analysis-Ready Data
 
@@ -18,7 +18,7 @@ The Figure 4 retraining input is:
 
 `training/data/figure4_retraining_input.csv.gz`
 
-This file is an 8-day processed panel with 1,000,127 rows. Each row represents an admin2/county-like unit in a given year and 8-day growing-season window. It contains:
+This file is an 8-day processed panel with 1,000,127 rows. Each row represents an admin2/county-like unit in a given year and 8-day growing-season window.
 
 - ID and grouping fields: `admin2_idx`, `year`, `koppen5`
 - target variable: `sif_anom`
@@ -26,7 +26,7 @@ This file is an 8-day processed panel with 1,000,127 rows. Each row represents a
 - water predictors: `SMa_L1_8mean`, `SMa_L2_8mean`, `SMa_L3_8mean`, `PPTa_8sum`
 - raw energy fields for hard-filter sensitivity: `VPD_8mean_raw`, `SW_8mean_raw`, `Tmax_8mean_raw`
 
-The default figure scripts also use packaged figure-ready inputs under `figure*/data/`, shared map layers under `common/map_layers/`, and supplement processed inputs under `supplement/data/`. See `DATA_DICTIONARY.md` for file-level documentation.
+The figure scripts use packaged figure-ready inputs under `figure*/data/`, shared map layers under `common/map_layers/`, and supplement inputs under `supplement/data/`.
 
 ## Install
 
@@ -49,7 +49,7 @@ conda env create -f environment.yml
 conda activate deep-soil-moisture-maize
 ```
 
-`requirements-lock.txt` records versions observed in the development environment.
+`requirements-lock.txt` records package versions from the development environment.
 
 ## Main-Text Figure Reproduction
 
@@ -67,13 +67,13 @@ Expected outputs:
 - `figure4/outputs/figure4_climate_zone_driver_importance.png`
 - `figure5/outputs/figure5_monitoring_blind_spot_risk.png`
 
-Run a lightweight import/path smoke check without rendering figures:
+Run a smoke check without rendering figures:
 
 ```bash
 python run_all_figures.py --smoke
 ```
 
-Figure 4 is plotted by default from the packaged model-result summaries in `figure4/data/summary.csv` and `figure4/data/koppen*/results.json`. This keeps the default figure-reproduction path lightweight and deterministic.
+Figure 4 is plotted from `figure4/data/summary.csv` and `figure4/data/koppen*/results.json`.
 
 ## Optional Figure 4 ML Retraining
 
@@ -112,17 +112,17 @@ The full non-quick workflow also syncs regenerated packaged Figure 4 data to:
 - `figure4/data/koppen4/results.json`
 - `figure4/data/koppen5/results.json`
 
-`--quick` intentionally leaves `figure4/data/` unchanged unless `--sync-figure-data` is provided. Full optional ML retraining is heavier than default figure reproduction.
+`--quick` leaves `figure4/data/` unchanged unless `--sync-figure-data` is provided.
 
-To audit retraining without replacing the packaged Figure 4 inputs, run:
+Run full retraining without replacing the packaged Figure 4 inputs:
 
 ```bash
 python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --no-sync-figure-data
 ```
 
-The default `python run_all_figures.py` path uses packaged processed outputs and does not rerun model training. Reviewers who want to reproduce Figure 4 from training can run `python training/run_optional_ml_retraining.py --bootstrap-iters 1000`; that command writes split IDs, validation folds, bootstrap confidence intervals, and model metrics.
+The default `python run_all_figures.py` command uses packaged Figure 4 model outputs. Full retraining writes split IDs, validation folds, bootstrap confidence intervals, and model metrics under `training/outputs/`.
 
-## Supplement Support
+## Supplement Reproduction
 
 Run supplement table reproduction:
 

@@ -1,6 +1,6 @@
 # Optional ML Retraining
 
-This directory contains the optional, self-contained retraining path for the machine-learning-dependent Figure 4 attribution analysis.
+This directory contains the optional Figure 4 XGBoost retraining workflow.
 
 ## Scope
 
@@ -9,7 +9,7 @@ This directory contains the optional, self-contained retraining path for the mac
 - `data/figure4_retraining_input.csv.gz`: packaged analysis-ready 8-day panel used for retraining.
 - `run_optional_ml_retraining.py`: command-line entry point.
 
-The workflow uses only in-repository code plus the packaged analysis-ready retraining panel.
+The workflow uses `training/data/figure4_retraining_input.csv.gz`.
 
 ## Commands
 
@@ -25,7 +25,7 @@ Full run from the packaged analysis-ready 8-day training panel:
 python training/run_optional_ml_retraining.py --bootstrap-iters 1000
 ```
 
-Quick mode reduces data size, tree count, cross-validation work, and bootstrap iterations for smoke testing. It writes complete output files but is not intended for manuscript numerical values.
+Quick mode reduces data size, tree count, cross-validation work, and bootstrap iterations for smoke testing.
 
 The full command uses `training/data/figure4_retraining_input.csv.gz` and the settings in `training/config.yml`. In the config, the default bootstrap setting is:
 
@@ -52,23 +52,23 @@ The workflow writes:
 
 The full non-quick workflow syncs regenerated Figure 4 packaged outputs into `figure4/data/`. Quick mode leaves `figure4/data/` unchanged unless `--sync-figure-data` is explicitly passed.
 
-To run full retraining without replacing the packaged Figure 4 inputs, use:
+Run full retraining without replacing the packaged Figure 4 inputs:
 
 ```bash
 python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --no-sync-figure-data
 ```
 
-## Leakage Controls
+## Split Controls
 
 - The split group is `county_year`, constructed from `admin2_idx` and `year`.
 - Train/test split is grouped, with all observations from the same county-year kept together.
 - Split assignment is stratified by year within each Koppen climate zone.
 - GroupKFold validation folds are assigned within each Koppen zone.
-- The workflow fails if a county-year group appears in both train and test or in more than one validation fold.
+- The workflow checks that no county-year group appears in both train and test or in more than one validation fold.
 
 ## Sample Weights
 
-The Figure 4 attribution model uses the same soft energy-availability sample weights as the packaged Figure 4 outputs. The weights are defined in `training/config.yml` from `SW_8mean_raw` and `Tmax_8mean_raw`. This weighting is separate from the S10 hard energy-filtering sensitivity.
+The Figure 4 attribution model uses soft energy-availability sample weights defined in `training/config.yml` from `SW_8mean_raw` and `Tmax_8mean_raw`.
 
 ## Hard Energy Filtering
 
