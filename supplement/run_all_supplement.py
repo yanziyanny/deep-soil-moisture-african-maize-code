@@ -20,56 +20,56 @@ FIGURE_SPECS = [
     (
         "S3 GLEAM SM-VPD coupling",
         [
-            "s3_gleam_sm_vpd_correlation.png",
-            "s3_gleam_sm_vpd_correlation.pdf",
+            "supplementary_figure_s3_gleam_sm_vpd_correlation.png",
+            "supplementary_figure_s3_gleam_sm_vpd_correlation.pdf",
         ],
     ),
     (
         "S4 GLDAS Noah SM-VPD coupling",
         [
-            "s4_gldas_sm_vpd_correlation.png",
-            "s4_gldas_sm_vpd_correlation.pdf",
+            "supplementary_figure_s4_gldas_sm_vpd_correlation.png",
+            "supplementary_figure_s4_gldas_sm_vpd_correlation.pdf",
         ],
     ),
     (
         "S5 GLDAS Noah nonlinear yield response",
         [
-            "s5_gldas_yield_response.png",
-            "s5_gldas_yield_response.pdf",
+            "supplementary_figure_s5_gldas_yield_response.png",
+            "supplementary_figure_s5_gldas_yield_response.pdf",
         ],
     ),
     (
         "S6 GLDAS Noah yield sensitivity",
         [
-            "s6_gldas_yield_sensitivity.png",
-            "s6_gldas_yield_sensitivity.pdf",
+            "supplementary_figure_s6_gldas_yield_sensitivity.png",
+            "supplementary_figure_s6_gldas_yield_sensitivity.pdf",
         ],
     ),
     (
         "S7 GLDAS Noah SIF attribution",
         [
-            "s7_gldas_sif_attribution.png",
-            "s7_gldas_sif_attribution.pdf",
+            "supplementary_figure_s7_gldas_sif_attribution.png",
+            "supplementary_figure_s7_gldas_sif_attribution.pdf",
         ],
     ),
     (
         "S8 XGBoost model performance",
         [
-            "s8_xgboost_model_performance.png",
+            "supplementary_figure_s8_sif_pred_vs_obs.png",
         ],
     ),
     (
         "S9 Shapley R2 decomposition",
         [
-            "s9_shapley_r2_decomposition.png",
-            "s9_shapley_r2_decomposition.pdf",
+            "supplementary_figure_s9_shapley_r2_decomposition.png",
+            "supplementary_figure_s9_shapley_r2_decomposition.pdf",
         ],
     ),
     (
         "S10 hard energy filtering",
         [
-            "s10_hard_energy_filtering_sensitivity.png",
-            "s10_hard_energy_filtering_sensitivity.pdf",
+            "supplementary_figure_s10_hard_energy_filtering.png",
+            "supplementary_figure_s10_hard_energy_filtering.pdf",
         ],
     ),
 ]

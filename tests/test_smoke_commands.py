@@ -31,14 +31,14 @@ def test_supplement_quick_runs():
     ]:
         assert status_by_item[item] == "written"
     for relative in [
-        "supplement/outputs/s3_gleam_sm_vpd_correlation.png",
-        "supplement/outputs/s4_gldas_sm_vpd_correlation.png",
-        "supplement/outputs/s5_gldas_yield_response.png",
-        "supplement/outputs/s6_gldas_yield_sensitivity.png",
-        "supplement/outputs/s7_gldas_sif_attribution.png",
-        "supplement/outputs/s8_xgboost_model_performance.png",
-        "supplement/outputs/s9_shapley_r2_decomposition.png",
-        "supplement/outputs/s10_hard_energy_filtering_sensitivity.png",
+        "supplement/outputs/supplementary_figure_s3_gleam_sm_vpd_correlation.png",
+        "supplement/outputs/supplementary_figure_s4_gldas_sm_vpd_correlation.png",
+        "supplement/outputs/supplementary_figure_s5_gldas_yield_response.png",
+        "supplement/outputs/supplementary_figure_s6_gldas_yield_sensitivity.png",
+        "supplement/outputs/supplementary_figure_s7_gldas_sif_attribution.png",
+        "supplement/outputs/supplementary_figure_s8_sif_pred_vs_obs.png",
+        "supplement/outputs/supplementary_figure_s9_shapley_r2_decomposition.png",
+        "supplement/outputs/supplementary_figure_s10_hard_energy_filtering.png",
     ]:
         assert (REPO_ROOT / relative).exists(), relative
 
