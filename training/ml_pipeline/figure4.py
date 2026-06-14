@@ -12,6 +12,11 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import yaml
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 from sklearn.model_selection import GroupKFold
 from xgboost import XGBRegressor
 
@@ -37,6 +42,12 @@ VAR_LABELS = {
     "PPTa_8sum": "PPT",
     "SMa_L2_8mean": "SM L2",
     "SMa_L3_8mean": "SM L3",
+}
+
+COLOR_MAP = {
+    "RootWater": "#1B7837",
+    "SurfaceWater": "#92C5DE",
+    "Energy": "#D95F02",
 }
 
 
@@ -585,7 +596,7 @@ def run_hard_filter_sensitivity(
     bootstrap_iters: int,
     quick: bool,
     seed: int,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     filtered = df[hard_filter_mask(df, prepared.hard_filter_columns)].copy()
     zone_col = config["data"]["climate_zone_variable"]
     group_col = config["data"]["grouping_variable"]
@@ -595,6 +606,7 @@ def run_hard_filter_sensitivity(
     hard_cfg = config["hard_energy_filter"]
     sw_threshold = hard_cfg["thresholds"]["SW_8mean_raw"]["value"]
     tmax_threshold = hard_cfg["thresholds"]["Tmax_8mean_raw"]["value"]
+    results: list[dict[str, Any]] = []
 
     for zone_id in sorted(filtered[zone_col].dropna().unique()):
         df_zone = filtered[filtered[zone_col] == zone_id].copy()
@@ -661,6 +673,22 @@ def run_hard_filter_sensitivity(
         drop_group_delta = {group: stats["mean"] for group, stats in group_bootstrap.items()}
         dominance = max(drop_group_delta, key=drop_group_delta.get)
         top_feature = max(drop_column_delta, key=drop_column_delta.get)
+        result_json = {
+            "koppen_id": int(zone_id),
+            "koppen_name": KOPPEN_NAMES[int(zone_id)],
+            "n_train": int(len(df_train)),
+            "n_test": int(len(df_test)),
+            "metrics": metrics,
+            "filtering": "hard",
+            "sw_threshold": sw_threshold,
+            "tmax_threshold": tmax_threshold,
+            "n_bootstrap": int(bootstrap_iters),
+            "drop_group_delta": drop_group_delta,
+            "drop_group_bootstrap": group_bootstrap,
+            "drop_column_delta": drop_column_delta,
+            "drop_column_bootstrap": column_bootstrap,
+        }
+        results.append(result_json)
 
         rows.append(
             {
@@ -681,7 +709,7 @@ def run_hard_filter_sensitivity(
                 "bootstrap_iters": int(bootstrap_iters),
             }
         )
-    return rows
+    return rows, results
 
 
 def run_zone(
@@ -778,11 +806,171 @@ def run_zone(
     }
 
 
+def write_hard_filter_outputs(
+    hard_results: list[dict[str, Any]],
+    prepared: PreparedData,
+    outputs_dir: Path,
+) -> None:
+    hard_dir = outputs_dir / "hard_energy_filtering"
+    hard_dir.mkdir(parents=True, exist_ok=True)
+    summary_rows = []
+    for result in hard_results:
+        zone_id = int(result["koppen_id"])
+        zone_dir = hard_dir / f"koppen{zone_id}"
+        zone_dir.mkdir(parents=True, exist_ok=True)
+        with (zone_dir / "results.json").open("w") as handle:
+            json.dump(result, handle, indent=2)
+        top_feature = max(result["drop_column_delta"], key=result["drop_column_delta"].get)
+        summary_rows.append(
+            {
+                "koppen_id": zone_id,
+                "koppen_name": result["koppen_name"],
+                "n_train": result["n_train"],
+                "n_test": result["n_test"],
+                "n_fixed": result["metrics"]["n_fixed"],
+                "test_r2": result["metrics"]["test_r2"],
+                "delta_energy": result["drop_group_delta"].get("Energy", np.nan),
+                "delta_surface": result["drop_group_delta"].get("SurfaceWater", np.nan),
+                "delta_rootwater": result["drop_group_delta"].get("RootWater", np.nan),
+                "dominance": max(result["drop_group_delta"], key=result["drop_group_delta"].get),
+                "top_var": VAR_LABELS.get(top_feature, top_feature),
+                "top_var_delta": result["drop_column_delta"][top_feature],
+                "sw_threshold": result["sw_threshold"],
+                "tmax_threshold": result["tmax_threshold"],
+                "bootstrap_iters": result["n_bootstrap"],
+            }
+        )
+    pd.DataFrame(summary_rows).sort_values("koppen_id").to_csv(hard_dir / "summary.csv", index=False)
+    if {int(result["koppen_id"]) for result in hard_results} == {1, 2, 3, 4, 5}:
+        plot_hard_filter_combined_figure(hard_results, prepared, hard_dir)
+
+
+def plot_hard_filter_combined_figure(
+    hard_results: list[dict[str, Any]],
+    prepared: PreparedData,
+    output_dir: Path,
+) -> None:
+    results = {int(result["koppen_id"]): result for result in hard_results}
+    feature_group = {
+        feature: group
+        for group, features in prepared.feature_groups.items()
+        for feature in features
+    }
+    plt.rcParams.update(
+        {
+            "font.family": "Arial",
+            "font.size": 18,
+            "axes.titlesize": 18,
+            "axes.labelsize": 18,
+            "xtick.labelsize": 16,
+            "ytick.labelsize": 16,
+            "legend.fontsize": 16,
+            "axes.linewidth": 1.0,
+            "xtick.major.width": 1.0,
+            "ytick.major.width": 1.0,
+            "xtick.major.size": 5,
+            "ytick.major.size": 5,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+        }
+    )
+
+    fig = plt.figure(figsize=(9.0, 6.2))
+    gs = fig.add_gridspec(
+        2,
+        5,
+        height_ratios=[1, 0.50],
+        hspace=0.38,
+        wspace=0.55,
+        left=0.08,
+        right=0.98,
+        top=0.92,
+        bottom=0.10,
+    )
+    panel_labels = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
+    short_names = {1: "Tropical", 2: "Savanna", 3: "Desert", 4: "Semi-arid", 5: "Temperate"}
+
+    fig.text(-0.025, 0.66, "Individual variables", fontsize=16, fontweight="bold", ha="center", va="center", rotation=90, color="#333333")
+    for idx, zone_id in enumerate(range(1, 6)):
+        ax = fig.add_subplot(gs[0, idx])
+        boot = results[zone_id]["drop_column_bootstrap"]
+        items = sorted(boot.items(), key=lambda item: item[1]["mean"], reverse=True)
+        labels = [VAR_LABELS[var] for var, _ in items]
+        values = [stats["mean"] for _, stats in items]
+        errors = np.array(
+            [
+                [stats["mean"] - stats["ci_low"] for _, stats in items],
+                [stats["ci_high"] - stats["mean"] for _, stats in items],
+            ]
+        )
+        colors = [COLOR_MAP[feature_group[var]] for var, _ in items]
+        y_pos = np.arange(len(labels))
+        ax.barh(y_pos, values, color=colors, height=0.68, edgecolor="none")
+        ax.errorbar(values, y_pos, xerr=errors, fmt="none", ecolor="#333333", elinewidth=0.8, capsize=2, capthick=0.6, clip_on=False)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(labels, fontsize=16)
+        ax.invert_yaxis()
+        ax.set_axisbelow(True)
+        ax.xaxis.grid(True, linestyle="-", linewidth=0.3, alpha=0.5, color="#CCCCCC")
+        ax.set_title(f"{short_names[zone_id]}\n($R^2$={results[zone_id]['metrics']['test_r2']:.2f})", fontsize=17, pad=8)
+        ax.text(-0.12, 1.12, panel_labels[idx], transform=ax.transAxes, fontsize=16, fontweight="bold", va="top")
+        ax.set_xlim(0, 0.08)
+        ax.set_xticks([0, 0.04, 0.08])
+        ax.set_xticklabels(["0", "0.04", "0.08"], fontsize=14)
+
+    fig.text(-0.025, 0.22, "Variable groups", fontsize=16, fontweight="bold", ha="center", va="center", rotation=90, color="#333333")
+    group_order = ["RootWater", "Energy", "SurfaceWater"]
+    group_labels = ["Root", "Energy", "Surface"]
+    for idx, zone_id in enumerate(range(1, 6)):
+        ax = fig.add_subplot(gs[1, idx])
+        boot = results[zone_id]["drop_group_bootstrap"]
+        values = [boot[group]["mean"] for group in group_order]
+        errors = np.array(
+            [
+                [boot[group]["mean"] - boot[group]["ci_low"] for group in group_order],
+                [boot[group]["ci_high"] - boot[group]["mean"] for group in group_order],
+            ]
+        )
+        y_pos = np.arange(len(group_order))
+        ax.barh(y_pos, values, color=[COLOR_MAP[group] for group in group_order], height=0.65, edgecolor="none")
+        ax.errorbar(values, y_pos, xerr=errors, fmt="none", ecolor="#333333", elinewidth=0.8, capsize=2.5, capthick=0.6, clip_on=False)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(group_labels if idx == 0 else [], fontsize=16)
+        ax.invert_yaxis()
+        ax.set_xlim(0, 0.15)
+        ax.set_xticks([0, 0.075, 0.15])
+        ax.set_xticklabels(["0", "0.075", "0.15"], fontsize=14)
+        ax.set_axisbelow(True)
+        ax.xaxis.grid(True, linestyle="-", linewidth=0.3, alpha=0.5, color="#CCCCCC")
+        ax.text(-0.12, 1.20, panel_labels[idx + 5], transform=ax.transAxes, fontsize=16, fontweight="bold", va="top")
+
+    fig.text(0.54, 0.005, r"$\Delta R^2$", fontsize=18, ha="center", va="bottom")
+    fig.legend(
+        handles=[
+            mpatches.Patch(facecolor=COLOR_MAP["RootWater"], edgecolor="none", label="Root Water (SM L2, L3)"),
+            mpatches.Patch(facecolor=COLOR_MAP["Energy"], edgecolor="none", label="Energy (VPD, SW, Tmax)"),
+            mpatches.Patch(facecolor=COLOR_MAP["SurfaceWater"], edgecolor="none", label="Surface Water (SM L1, PPT)"),
+        ],
+        loc="upper center",
+        bbox_to_anchor=(0.53, 1.12),
+        frameon=False,
+        fontsize=16,
+        ncol=3,
+        handlelength=1.3,
+        handletextpad=0.5,
+        columnspacing=1.8,
+    )
+    fig.savefig(output_dir / "figure_dropcol_combined_nature_v3.png", dpi=600, bbox_inches="tight", facecolor="white")
+    fig.savefig(output_dir / "figure_dropcol_combined_nature_v3.pdf", bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+
+
 def write_artifacts(
     zone_outputs: list[dict[str, Any]],
     prepared: PreparedData,
     split_groups: pd.DataFrame,
     hard_rows: list[dict[str, Any]],
+    hard_results: list[dict[str, Any]],
     config: dict[str, Any],
     outputs_dir: Path,
     sync_figure_data: bool,
@@ -908,6 +1096,7 @@ def write_artifacts(
     pd.concat(prediction_frames, ignore_index=True).to_csv(outputs_dir / "s8_model_predictions.csv", index=False)
     hard_table = pd.DataFrame(hard_rows)
     hard_table.to_csv(outputs_dir / "hard_energy_filtering_sensitivity.csv", index=False)
+    write_hard_filter_outputs(hard_results, prepared, outputs_dir)
     summary = pd.DataFrame(summary_rows).sort_values("koppen_id")
     summary.to_csv(figure_output_root / "summary.csv", index=False)
 
@@ -919,6 +1108,9 @@ def write_artifacts(
         "training/outputs/bootstrap_confidence_intervals.csv",
         "training/outputs/s8_model_predictions.csv",
         "training/outputs/hard_energy_filtering_sensitivity.csv",
+        "training/outputs/hard_energy_filtering/summary.csv",
+        "training/outputs/hard_energy_filtering/koppen*/results.json",
+        "training/outputs/hard_energy_filtering/figure_dropcol_combined_nature_v3.png",
         "training/outputs/train_test_split_ids.csv",
         "training/outputs/groupkfold_fold_ids.csv",
         "training/outputs/figure4_data/summary.csv",
@@ -977,7 +1169,7 @@ def run_pipeline(
         split_frames.append(output["split_groups"])
     split_groups = pd.concat(split_frames, ignore_index=True)
     print("[retrain_figure4] Training hard-filter sensitivity")
-    hard_rows = run_hard_filter_sensitivity(df, prepared, config, int(bootstrap_iters), quick, seed)
+    hard_rows, hard_results = run_hard_filter_sensitivity(df, prepared, config, int(bootstrap_iters), quick, seed)
 
     metadata = {
         "quick": bool(quick),
@@ -996,7 +1188,7 @@ def run_pipeline(
         "platform": platform.platform(),
         "runtime_seconds": float(time.perf_counter() - start),
     }
-    write_artifacts(zone_outputs, prepared, split_groups, hard_rows, config, outputs_dir, sync_figure_data, metadata)
+    write_artifacts(zone_outputs, prepared, split_groups, hard_rows, hard_results, config, outputs_dir, sync_figure_data, metadata)
     print(f"[retrain_figure4] Wrote machine-readable outputs to {outputs_dir}")
     if sync_figure_data:
         print("[retrain_figure4] Synced Figure 4 packaged outputs to figure4/data")

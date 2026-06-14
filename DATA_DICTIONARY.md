@@ -40,3 +40,5 @@ The packaged analysis-ready dataset consists of:
 ## Generated Outputs
 
 Generated outputs are written under `figure*/outputs/`, `training/outputs/`, and `supplement/outputs/`.
+
+Key optional ML retraining outputs include `training/outputs/s8_model_predictions.csv`, `training/outputs/hard_energy_filtering/koppen*/results.json`, `training/outputs/hard_energy_filtering/figure_dropcol_combined_nature_v3.png`, and `training/outputs/shapley_r2/s9_shapley_group_decomposition.csv`.

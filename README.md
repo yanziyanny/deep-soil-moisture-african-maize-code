@@ -98,6 +98,10 @@ Expected machine-readable outputs:
 - `training/outputs/drop_column_importance_group.csv`
 - `training/outputs/bootstrap_confidence_intervals.csv`
 - `training/outputs/s8_model_predictions.csv`
+- `training/outputs/hard_energy_filtering_sensitivity.csv`
+- `training/outputs/hard_energy_filtering/summary.csv`
+- `training/outputs/hard_energy_filtering/koppen*/results.json`
+- `training/outputs/hard_energy_filtering/figure_dropcol_combined_nature_v3.png`
 - `training/outputs/train_test_split_ids.csv`
 - `training/outputs/groupkfold_fold_ids.csv`
 - `training/outputs/run_metadata.json`
@@ -122,6 +126,19 @@ python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --no-sync-f
 ```
 
 The default `python run_all_figures.py` command uses packaged Figure 4 model outputs. Full retraining writes split IDs, validation folds, bootstrap confidence intervals, and model metrics under `training/outputs/`.
+
+Run the Supplementary Figure S9 Shapley R2 retraining workflow:
+
+```bash
+python training/run_s9_shapley_r2.py --bootstrap-iters 1000
+```
+
+Expected S9 retraining outputs:
+
+- `training/outputs/shapley_r2/summary.csv`
+- `training/outputs/shapley_r2/s9_shapley_group_decomposition.csv`
+- `training/outputs/shapley_r2/koppen*/results.json`
+- `training/outputs/shapley_r2/figure_shapley_r2_stacked.png`
 
 ## Supplement Figure Reproduction
 

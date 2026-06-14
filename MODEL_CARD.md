@@ -37,7 +37,7 @@ It also writes `training/outputs/s8_model_predictions.csv`, containing held-out 
 - Additional metrics: train R2, test MAE, test RMSE, cross-validation R2 summaries.
 - Ablation design: drop-column Delta R2 for individual predictors and functional groups.
 - Bootstrap CIs: bootstrap resampling of held-out rows with replacement.
-- Shapley R2 sensitivity: group-level values are packaged in `supplement/data/shapley_r2/`.
+- Shapley R2 sensitivity: group-level values are packaged in `supplement/data/shapley_r2/`; the coalition retraining workflow is `training/run_s9_shapley_r2.py`.
 - Partial R2: single-feature XGBoost fits are reported as an additional sensitivity.
 
 ## Baseline and Sensitivity Context
@@ -57,3 +57,4 @@ The configured hard energy thresholds are:
 - SW >= 21.6 MJ m-2 day-1.
 
 The hard-filter sensitivity filters observations before splitting and retrains unweighted models.
+It writes per-zone hard-filter `results.json` files with individual and group bootstrap confidence intervals under `training/outputs/hard_energy_filtering/`.

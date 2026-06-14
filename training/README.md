@@ -45,6 +45,9 @@ The workflow writes:
 - `training/outputs/bootstrap_confidence_intervals.csv`
 - `training/outputs/s8_model_predictions.csv`
 - `training/outputs/hard_energy_filtering_sensitivity.csv`
+- `training/outputs/hard_energy_filtering/summary.csv`
+- `training/outputs/hard_energy_filtering/koppen*/results.json`
+- `training/outputs/hard_energy_filtering/figure_dropcol_combined_nature_v3.png`
 - `training/outputs/train_test_split_ids.csv`
 - `training/outputs/groupkfold_fold_ids.csv`
 - `training/outputs/run_metadata.json`
@@ -74,3 +77,20 @@ The Figure 4 attribution model uses soft energy-availability sample weights defi
 ## Hard Energy Filtering
 
 The hard-filter sensitivity filters observations before splitting, then retrains unweighted models. Thresholds are configured in `training/config.yml`: `SW_8mean_raw >= 21.6` MJ m-2 day-1 and `Tmax_8mean_raw >= 18` C.
+
+## Shapley R2 Retraining
+
+Supplementary Figure S9 uses the original Shapley R2 coalition workflow: train all seven non-empty group coalitions, evaluate held-out R2, and bootstrap held-out rows without retraining the coalition models.
+
+Run:
+
+```bash
+python training/run_s9_shapley_r2.py --bootstrap-iters 1000
+```
+
+Outputs:
+
+- `training/outputs/shapley_r2/summary.csv`
+- `training/outputs/shapley_r2/s9_shapley_group_decomposition.csv`
+- `training/outputs/shapley_r2/koppen*/results.json`
+- `training/outputs/shapley_r2/figure_shapley_r2_stacked.png`

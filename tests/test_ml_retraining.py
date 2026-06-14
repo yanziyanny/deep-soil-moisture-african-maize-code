@@ -16,6 +16,13 @@ EXPECTED_OUTPUTS = [
     "bootstrap_confidence_intervals.csv",
     "s8_model_predictions.csv",
     "hard_energy_filtering_sensitivity.csv",
+    "hard_energy_filtering/summary.csv",
+    "hard_energy_filtering/figure_dropcol_combined_nature_v3.png",
+    "hard_energy_filtering/koppen1/results.json",
+    "hard_energy_filtering/koppen2/results.json",
+    "hard_energy_filtering/koppen3/results.json",
+    "hard_energy_filtering/koppen4/results.json",
+    "hard_energy_filtering/koppen5/results.json",
     "run_metadata.json",
     "train_test_split_ids.csv",
     "groupkfold_fold_ids.csv",
@@ -70,6 +77,43 @@ def test_quick_retraining_outputs_and_leakage_checks(tmp_path):
     predictions = pd.read_csv(output_dir / "s8_model_predictions.csv")
     assert {"koppen_id", "observed_sif_anom", "predicted_sif_anom", "group_id"}.issubset(predictions.columns)
     assert len(predictions) > 0
+
+    with (output_dir / "hard_energy_filtering/koppen1/results.json").open("r") as handle:
+        hard_result = json.load(handle)
+    assert {"drop_column_bootstrap", "drop_group_bootstrap"}.issubset(hard_result)
+    assert hard_result["sw_threshold"] == 21.6
+    assert hard_result["tmax_threshold"] == 18
+
+
+def test_quick_s9_shapley_retraining_outputs(tmp_path):
+    output_dir = tmp_path / "s9_outputs"
+    subprocess.run(
+        [
+            sys.executable,
+            "training/run_s9_shapley_r2.py",
+            "--quick",
+            "--zones",
+            "1",
+            "--bootstrap-iters",
+            "3",
+            "--outputs-dir",
+            str(output_dir),
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+    )
+    for relative in [
+        "summary.csv",
+        "s9_shapley_group_decomposition.csv",
+        "koppen1/results.json",
+    ]:
+        assert (output_dir / relative).exists(), relative
+    s9 = pd.read_csv(output_dir / "s9_shapley_group_decomposition.csv")
+    check = s9.groupby("koppen_id").agg(
+        full_model_r2=("full_model_r2", "first"),
+        shapley_sum=("shapley_r2", "sum"),
+    )
+    assert (check["full_model_r2"] - check["shapley_sum"]).abs().max() < 1e-9
 
 
 def test_figure4_split_matches_packaged_results():
