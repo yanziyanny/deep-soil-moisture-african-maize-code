@@ -43,6 +43,7 @@ The workflow writes:
 - `training/outputs/drop_column_importance_individual.csv`
 - `training/outputs/drop_column_importance_group.csv`
 - `training/outputs/bootstrap_confidence_intervals.csv`
+- `training/outputs/s8_model_predictions.csv`
 - `training/outputs/hard_energy_filtering_sensitivity.csv`
 - `training/outputs/train_test_split_ids.csv`
 - `training/outputs/groupkfold_fold_ids.csv`

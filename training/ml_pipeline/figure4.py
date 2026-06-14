@@ -720,6 +720,13 @@ def run_zone(
     y_test = df_test[target].to_numpy()
     weights = df_test["sample_weight"].to_numpy()
     baseline_pred = baseline_model.predict(df_test[features].to_numpy())
+    predictions = df_test[[data_cfg["admin_unit_variable"], year_col, group_col]].copy()
+    predictions.insert(0, "koppen_name", KOPPEN_NAMES[int(zone_id)])
+    predictions.insert(0, "koppen_id", int(zone_id))
+    predictions["observed_sif_anom"] = y_test
+    predictions["predicted_sif_anom"] = baseline_pred
+    predictions["sample_weight"] = weights
+    predictions = predictions.rename(columns={data_cfg["admin_unit_variable"]: "admin2_idx", group_col: "group_id"})
 
     drop_column_predictions: dict[str, np.ndarray] = {}
     drop_column_r2: dict[str, float] = {}
@@ -767,6 +774,7 @@ def run_zone(
         "split_groups": split_groups,
         "drop_column_r2": drop_column_r2,
         "drop_group_r2": drop_group_r2,
+        "predictions": predictions,
     }
 
 
@@ -793,12 +801,14 @@ def write_artifacts(
     drop_group_rows = []
     bootstrap_rows = []
     summary_rows = []
+    prediction_frames = []
 
     for zone_output in zone_outputs:
         result = zone_output["result_json"]
         zone_id = result["koppen_id"]
         zone_name = result["koppen_name"]
         metrics = result["metrics"]
+        prediction_frames.append(zone_output["predictions"])
         metrics_rows.append(
             {
                 "koppen_id": zone_id,
@@ -895,6 +905,7 @@ def write_artifacts(
     pd.DataFrame(drop_individual_rows).to_csv(outputs_dir / "drop_column_importance_individual.csv", index=False)
     pd.DataFrame(drop_group_rows).to_csv(outputs_dir / "drop_column_importance_group.csv", index=False)
     pd.DataFrame(bootstrap_rows).to_csv(outputs_dir / "bootstrap_confidence_intervals.csv", index=False)
+    pd.concat(prediction_frames, ignore_index=True).to_csv(outputs_dir / "s8_model_predictions.csv", index=False)
     hard_table = pd.DataFrame(hard_rows)
     hard_table.to_csv(outputs_dir / "hard_energy_filtering_sensitivity.csv", index=False)
     summary = pd.DataFrame(summary_rows).sort_values("koppen_id")
@@ -906,6 +917,7 @@ def write_artifacts(
         "training/outputs/drop_column_importance_individual.csv",
         "training/outputs/drop_column_importance_group.csv",
         "training/outputs/bootstrap_confidence_intervals.csv",
+        "training/outputs/s8_model_predictions.csv",
         "training/outputs/hard_energy_filtering_sensitivity.csv",
         "training/outputs/train_test_split_ids.csv",
         "training/outputs/groupkfold_fold_ids.csv",

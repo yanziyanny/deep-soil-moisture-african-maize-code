@@ -14,6 +14,7 @@ EXPECTED_OUTPUTS = [
     "drop_column_importance_individual.csv",
     "drop_column_importance_group.csv",
     "bootstrap_confidence_intervals.csv",
+    "s8_model_predictions.csv",
     "hard_energy_filtering_sensitivity.csv",
     "run_metadata.json",
     "train_test_split_ids.csv",
@@ -65,6 +66,10 @@ def test_quick_retraining_outputs_and_leakage_checks(tmp_path):
     assert set(hard_filter["sw_threshold"]) == {21.6}
     assert set(hard_filter["tmax_threshold"]) == {18.0}
     assert "vpd_threshold" not in {column.lower() for column in hard_filter.columns}
+
+    predictions = pd.read_csv(output_dir / "s8_model_predictions.csv")
+    assert {"koppen_id", "observed_sif_anom", "predicted_sif_anom", "group_id"}.issubset(predictions.columns)
+    assert len(predictions) > 0
 
 
 def test_figure4_split_matches_packaged_results():

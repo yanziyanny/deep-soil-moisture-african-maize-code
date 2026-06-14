@@ -28,6 +28,7 @@ The retraining input is `training/data/figure4_retraining_input.csv.gz`.
 - Random seed: `random_seed` in `training/config.yml`.
 
 The retraining workflow writes `training/outputs/train_test_split_ids.csv` and `training/outputs/groupkfold_fold_ids.csv`, and checks that no county-year group appears in both train and test or in more than one validation fold.
+It also writes `training/outputs/s8_model_predictions.csv`, containing held-out observed and predicted SIF anomalies for reproducing the Supplementary Figure S8 predicted-versus-observed performance panel.
 
 ## Metrics and Interpretation
 

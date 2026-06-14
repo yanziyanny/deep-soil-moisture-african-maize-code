@@ -1,12 +1,12 @@
 # Deep soil moisture reveals hidden water stress in African rainfed maize systems
 
-This repository contains code and analysis-ready processed data for reproducing the submitted figures, supplement summaries, and Figure 4 machine-learning retraining for the manuscript *Deep soil moisture reveals hidden water stress in African rainfed maize systems*.
+This repository contains code and analysis-ready processed data for reproducing the submitted main-text figures, supplement figure panels, and Figure 4 machine-learning retraining for the manuscript *Deep soil moisture reveals hidden water stress in African rainfed maize systems*.
 
 ## Contents
 
 - `figure*/`: main-text figure scripts and packaged figure inputs.
 - `common/map_layers/`: shared map inputs.
-- `supplement/`: supplement table and figure-copy reproduction.
+- `supplement/`: supplement figure panel reproduction.
 - `training/`: optional Figure 4 XGBoost retraining workflow.
 - `DATA_DICTIONARY.md`: packaged input file descriptions.
 - `MODEL_CARD.md`: Figure 4 model, split, metric, and baseline details.
@@ -97,6 +97,7 @@ Expected machine-readable outputs:
 - `training/outputs/drop_column_importance_individual.csv`
 - `training/outputs/drop_column_importance_group.csv`
 - `training/outputs/bootstrap_confidence_intervals.csv`
+- `training/outputs/s8_model_predictions.csv`
 - `training/outputs/train_test_split_ids.csv`
 - `training/outputs/groupkfold_fold_ids.csv`
 - `training/outputs/run_metadata.json`
@@ -122,9 +123,9 @@ python training/run_optional_ml_retraining.py --bootstrap-iters 1000 --no-sync-f
 
 The default `python run_all_figures.py` command uses packaged Figure 4 model outputs. Full retraining writes split IDs, validation folds, bootstrap confidence intervals, and model metrics under `training/outputs/`.
 
-## Supplement Reproduction
+## Supplement Figure Reproduction
 
-Run supplement table reproduction:
+Run supplement figure reproduction:
 
 ```bash
 python supplement/run_all_supplement.py --quick
@@ -132,14 +133,14 @@ python supplement/run_all_supplement.py --quick
 
 Expected outputs:
 
-- `supplement/outputs/s3_gleam_sm_vpd_coupling_summary.csv`
-- `supplement/outputs/s4_gldas_sm_vpd_coupling_summary.csv`
-- `supplement/outputs/s5_gldas_yield_response_coefficients.csv`
-- `supplement/outputs/s6_gldas_yield_sensitivity_r2.csv`
-- `supplement/outputs/s7_gldas_sif_attribution_summary.csv`
-- `supplement/outputs/s8_xgboost_model_performance.csv`
-- `supplement/outputs/s9_shapley_group_decomposition.csv`
-- `supplement/outputs/s10_hard_energy_filtering_sensitivity.csv`
+- `supplement/outputs/s3_gleam_sm_vpd_correlation.png`
+- `supplement/outputs/s4_gldas_sm_vpd_correlation.png`
+- `supplement/outputs/s5_gldas_yield_response.png`
+- `supplement/outputs/s6_gldas_yield_sensitivity.png`
+- `supplement/outputs/s7_gldas_sif_attribution.png`
+- `supplement/outputs/s8_xgboost_model_performance.png`
+- `supplement/outputs/s9_shapley_r2_decomposition.png`
+- `supplement/outputs/s10_hard_energy_filtering_sensitivity.png`
 - `supplement/outputs/supplement_run_report.json`
 
 Supplement processed inputs are listed in `DATA_DICTIONARY.md`.
